@@ -62,6 +62,63 @@
                             泡泡&nbsp;&nbsp;{{ prettyQuoteNum(userInfo.tweets_count) }}
                         </span>
                     </div>
+
+                    <!-- PT 专区统计数据嵌入 -->
+                    <div v-if="ptProfile" class="pt-profile-card">
+                        <div class="pt-stat-grid">
+                            <div class="pt-stat-item">
+                                <span class="pt-label">分享率</span>
+                                <span class="pt-val ratio" :class="{ warning: ptProfile.downloaded > 0 && ptProfile.ratio < 1 }">
+                                    {{ ptProfile.downloaded === 0 ? '∞' : ptProfile.ratio.toFixed(2) }}
+                                </span>
+                            </div>
+                            <div class="pt-stat-item">
+                                <span class="pt-label">上传量</span>
+                                <span class="pt-val up">{{ formatBytes(ptProfile.uploaded) }}</span>
+                            </div>
+                            <div class="pt-stat-item">
+                                <span class="pt-label">下载量</span>
+                                <span class="pt-val down">{{ formatBytes(ptProfile.downloaded) }}</span>
+                            </div>
+                            <div class="pt-stat-item">
+                                <span class="pt-label">魔力值</span>
+                                <span class="pt-val bonus">{{ ptProfile.seed_bonus.toFixed(1) }}</span>
+                            </div>
+                            <div class="pt-stat-item">
+                                <span class="pt-label">当前做种</span>
+                                <span class="pt-val">{{ ptProfile.seeding_count }}</span>
+                            </div>
+                            <div class="pt-stat-item">
+                                <span class="pt-label">当前下载</span>
+                                <span class="pt-val">{{ ptProfile.leech_count }}</span>
+                            </div>
+                        </div>
+                        <div class="pt-passkey-row">
+                            <span class="passkey-title">Passkey:</span>
+                            <span class="passkey-code">{{ maskedPasskey }}</span>
+                            <n-button size="tiny" quaternary type="primary" @click="copyPasskey">复制</n-button>
+                            <n-popconfirm @positive-click="handleResetPasskey">
+                                <template #trigger>
+                                    <n-button size="tiny" quaternary type="warning">重置</n-button>
+                                </template>
+                                重置后旧 Passkey 将失效，需更新 BT 客户端中任务的 Tracker 地址，确定重置？
+                            </n-popconfirm>
+                        </div>
+                        <div class="pt-tracker-row" v-if="ptProfile.http_tracker_url || ptProfile.ws_tracker_url">
+                            <div class="tracker-item" v-if="ptProfile.http_tracker_url">
+                                <span class="tracker-tag http">HTTP</span>
+                                <span class="tracker-title">HTTP Tracker:</span>
+                                <span class="tracker-url" :title="ptProfile.http_tracker_url">{{ ptProfile.http_tracker_url }}</span>
+                                <n-button size="tiny" quaternary type="primary" @click="copyText(ptProfile.http_tracker_url, 'HTTP Tracker 地址已复制')">复制</n-button>
+                            </div>
+                            <div class="tracker-item" v-if="ptProfile.ws_tracker_url">
+                                <span class="tracker-tag ws">WS</span>
+                                <span class="tracker-title">WebSocket Tracker (WebTorrent):</span>
+                                <span class="tracker-url" :title="ptProfile.ws_tracker_url">{{ ptProfile.ws_tracker_url }}</span>
+                                <n-button size="tiny" quaternary type="primary" @click="copyText(ptProfile.ws_tracker_url, 'WebSocket Tracker 地址已复制')">复制</n-button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="user-opts">
@@ -132,6 +189,8 @@ import { MoreHorizFilled } from '@vicons/material';
 import { useStoreUser } from '@/store/user';
 import { storeToRefs } from 'pinia';
 import { Api } from '@/utils/request';
+import { getUserPTProfile, resetUserPasskey, type UserPTProfile } from '@/api/pt';
+import copy from 'copy-to-clipboard';
 
 type PageType = 'post' | 'comment' | 'highlight' | 'media' | 'star';
 
@@ -262,7 +321,59 @@ function updateFolloing(
   }
 }
 
+const ptProfile = ref<UserPTProfile | null>(null);
+
+const formatBytes = (bytes: number) => {
+  if (!bytes || bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+};
+
+const maskedPasskey = computed(() => {
+  if (!ptProfile.value?.passkey) return '';
+  const k = ptProfile.value.passkey;
+  return k.length > 12 ? `${k.slice(0, 6)}...${k.slice(-6)}` : k;
+});
+
+const copyPasskey = () => {
+  if (ptProfile.value?.passkey) {
+    copy(ptProfile.value.passkey);
+    window.$message.success('Passkey 已复制');
+  }
+};
+
+const copyText = (txt?: string, tip?: string) => {
+  if (txt) {
+    copy(txt);
+    window.$message.success(tip || '已复制');
+  }
+};
+
+const handleResetPasskey = async () => {
+  try {
+    const res = await resetUserPasskey();
+    if (ptProfile.value) {
+      ptProfile.value.passkey = res.passkey;
+    }
+    window.$message.success('Passkey 重置成功');
+  } catch (err: any) {
+    window.$message.error(err.message || '重置失败');
+  }
+};
+
+const loadPTProfile = async () => {
+  try {
+    const res = await getUserPTProfile();
+    ptProfile.value = res;
+  } catch (e) {
+    // ignore
+  }
+};
+
 const loadPage = () => {
+  loadPTProfile();
   loadPostsByStyle(pageType.value);
 };
 const styleListMap = {
@@ -387,6 +498,130 @@ watch(
 
         .top-tag {
             transform: scale(0.75);
+        }
+
+        .pt-profile-card {
+            margin-top: 14px;
+            padding: 10px 14px;
+            background: rgba(128, 128, 128, 0.06);
+            border-radius: 8px;
+            border: 1px solid rgba(128, 128, 128, 0.12);
+
+            .pt-stat-grid {
+                display: grid;
+                grid-template-columns: repeat(6, 1fr);
+                gap: 8px;
+                text-align: center;
+
+                @media (max-width: 640px) {
+                    grid-template-columns: repeat(3, 1fr);
+                    row-gap: 10px;
+                }
+
+                .pt-stat-item {
+                    display: flex;
+                    flex-direction: column;
+
+                    .pt-label {
+                        font-size: 11px;
+                        opacity: 0.65;
+                        margin-bottom: 2px;
+                    }
+
+                    .pt-val {
+                        font-size: 13px;
+                        font-weight: 600;
+
+                        &.up {
+                            color: #18a058;
+                        }
+                        &.down {
+                            color: #d03050;
+                        }
+                        &.bonus {
+                            color: #f0a020;
+                        }
+                        &.ratio {
+                            color: #2080f0;
+                            &.warning {
+                                color: #d03050;
+                            }
+                        }
+                    }
+                }
+            }
+
+            .pt-passkey-row {
+                margin-top: 8px;
+                padding-top: 8px;
+                border-top: 1px dashed rgba(128, 128, 128, 0.15);
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                font-size: 12px;
+
+                .passkey-title {
+                    opacity: 0.65;
+                    font-weight: 500;
+                }
+
+                .passkey-code {
+                    font-family: monospace;
+                    background: rgba(128, 128, 128, 0.1);
+                    padding: 2px 6px;
+                    border-radius: 4px;
+                    letter-spacing: 0.5px;
+                }
+            }
+
+            .pt-tracker-row {
+                margin-top: 8px;
+                padding-top: 8px;
+                border-top: 1px dashed rgba(128, 128, 128, 0.15);
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+                font-size: 12px;
+
+                .tracker-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    overflow: hidden;
+
+                    .tracker-tag {
+                        font-size: 10px;
+                        font-weight: 700;
+                        padding: 1px 4px;
+                        border-radius: 3px;
+                        &.http {
+                            background: rgba(32, 128, 240, 0.15);
+                            color: #2080f0;
+                        }
+                        &.ws {
+                            background: rgba(24, 160, 88, 0.15);
+                            color: #18a058;
+                        }
+                    }
+
+                    .tracker-title {
+                        font-weight: 500;
+                        opacity: 0.7;
+                        white-space: nowrap;
+                    }
+
+                    .tracker-url {
+                        flex: 1;
+                        font-family: monospace;
+                        background: rgba(128, 128, 128, 0.1);
+                        padding: 2px 6px;
+                        border-radius: 4px;
+                        white-space: nowrap;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                    }
+                }
+            }
         }
     }
 

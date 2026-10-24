@@ -99,6 +99,22 @@ const routes = [
     component: () => import('@/views/Setting.vue'),
   },
   {
+    path: '/bonus',
+    name: 'bonus',
+    meta: {
+      title: '魔力商城',
+    },
+    component: () => import('@/views/pt/BonusShop.vue'),
+  },
+  {
+    path: '/pt/detail',
+    name: 'pt-detail',
+    meta: {
+      title: '种子详情',
+    },
+    component: () => import('@/views/pt/TorrentDetail.vue'),
+  },
+  {
     path: '/admin/settings',
     name: 'admin-settings',
     meta: {

@@ -36,7 +36,7 @@ JobManager: # Cron Job理器的配置参数
   MaxOnlineInterval: "@every 5m"       # 更新最大在线人数，默认每5分钟更新一次
   UpdateMetricsInterval: "@every 5m"   # 更新Prometheus指标，默认每5分钟更新一次
 Features:
-  Default: []
+  Default: ["Web", "Frontend:EmbedWeb", "LocalOSS", "Sqlite3", "PT"]
 WebServer: # Web服务
   RunMode: debug
   HttpIp: 0.0.0.0
@@ -277,3 +277,10 @@ WebProfile:
   CopyrightLeftLink: ""
   CopyrightRight: "泡泡(PaoPao)开源社区"
   CopyrightRightLink: "https://github.com/rocboss/paopao-ce"
+PT:
+  AnnounceUrl: "http://127.0.0.1:8008/tracker/announce"
+  WsAnnounceUrl: "ws://127.0.0.1:8008/tracker/ws"
+  AnnounceInterval: 1800
+  MinInterval: 300
+  SiteSource: "[PaoPao] PaoPao PT"
+  StoragePath: "custom/data/paopao-ce/torrents"

@@ -43,6 +43,15 @@
                 >
                     好友可见
                 </n-tag>
+                <n-tag
+                    v-if="post.torrent && post.torrent.sp_state > 1"
+                    class="top-tag"
+                    :type="getSpType(post.torrent.sp_state)"
+                    size="small"
+                    round
+                >
+                    {{ getSpLabel(post.torrent.sp_state) }}
+                </n-tag>
             </template>
             <template #header-extra>
                 <div class="options">
@@ -157,6 +166,7 @@
                 <post-image :imgs="post.imgs" />
                 <post-video :videos="post.videos" :full="true" />
                 <post-link :links="post.links" />
+                <post-torrent v-if="post.torrent" :torrent="post.torrent" />
                 <div class="timestamp">
                     发布于 {{ formatPrettyTime(post.created_on) }}
                     <span v-if="post.ip_loc">
@@ -253,6 +263,7 @@ import {
   highlightPost,
   visibilityPost,
 } from '@/api/post';
+import { getSpLabel, getSpType } from '@/api/pt';
 import type { DropdownOption } from 'naive-ui';
 import { VisibilityEnum } from '@/utils/IEnum';
 import copy from 'copy-to-clipboard';

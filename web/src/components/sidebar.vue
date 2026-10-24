@@ -67,6 +67,7 @@ import {
   PeopleOutline,
   WalletOutline,
   SettingsOutline,
+  GiftOutline,
   ConstructOutline,
   LogOutOutline,
 } from '@vicons/ionicons5';
@@ -189,6 +190,12 @@ const menuOptions = computed(() => {
       href: '/wallet',
     });
   }
+  options.push({
+    label: '魔力商城',
+    key: 'bonus',
+    icon: () => h(GiftOutline),
+    href: '/bonus',
+  });
   options.push({
     label: '设置',
     key: 'setting',

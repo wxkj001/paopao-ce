@@ -160,6 +160,33 @@
                                 </n-icon>
                             </template>
                         </n-button>
+
+                        <n-tooltip trigger="hover">
+                            <template #trigger>
+                                <n-button
+                                    :loading="uploadingTorrent"
+                                    :disabled="currentTorrent !== null"
+                                    quaternary
+                                    circle
+                                    type="primary"
+                                    @click="triggerTorrentUpload"
+                                >
+                                    <template #icon>
+                                        <n-icon size="20" color="var(--primary-color)">
+                                            <cloud-download-outline />
+                                        </n-icon>
+                                    </template>
+                                </n-button>
+                            </template>
+                            添加 PT 种子 (.torrent)
+                        </n-tooltip>
+                        <input
+                            ref="torrentFileInputRef"
+                            type="file"
+                            accept=".torrent"
+                            style="display: none"
+                            @change="onTorrentFileSelected"
+                        />
                     </div>
 
                     <div class="submit-wrap">
@@ -206,6 +233,32 @@
                                 <span> 附件价格￥</span>
                             </template>
                         </n-input-number>
+                    </div>
+                </div>
+
+                <div v-if="currentTorrent" class="compose-torrent-card">
+                    <div class="compose-torrent-info">
+                        <n-icon size="24" color="#18a058">
+                            <cloud-download-outline />
+                        </n-icon>
+                        <div class="compose-torrent-text">
+                            <span class="compose-torrent-name">{{ currentTorrent.name }}</span>
+                            <span class="compose-torrent-size">{{ formatBytes(currentTorrent.size) }}</span>
+                        </div>
+                    </div>
+                    <div class="compose-torrent-opts">
+                        <n-select
+                            v-model:value="currentTorrentSpState"
+                            :options="spStateOptions"
+                            size="small"
+                            style="width: 120px"
+                            @update:value="handleSpStateChange"
+                        />
+                        <n-button quaternary circle size="small" type="error" @click="removeCurrentTorrent">
+                            <template #icon>
+                                <n-icon><close-outline /></n-icon>
+                            </template>
+                        </n-button>
                     </div>
                 </div>
             </n-upload>
@@ -287,8 +340,11 @@ import {
   AttachOutline,
   CompassOutline,
   EyeOutline,
+  CloudDownloadOutline,
+  CloseOutline,
 } from '@vicons/ionicons5';
 import { createPost } from '@/api/post';
+import { uploadTorrent, editTorrent, deleteTorrent, type TorrentItem } from '@/api/pt';
 import { parsePostTag } from '@/utils/content';
 import { isZipFile } from '@/utils/isZipFile';
 import type { MentionOption, UploadFileInfo, UploadInst } from 'naive-ui';
@@ -323,6 +379,81 @@ const videoContents = ref<Item.CommentItemProps[]>([]);
 const attachmentContents = ref<Item.AttachmentProps[]>([]);
 const visitType = ref<VisibilityEnum>(VisibilityEnum.PUBLIC);
 const defaultVisitType = ref<VisibilityEnum>(VisibilityEnum.PUBLIC);
+
+const currentTorrent = ref<TorrentItem | null>(null);
+const currentTorrentSpState = ref<number>(1);
+const uploadingTorrent = ref(false);
+const torrentFileInputRef = ref<HTMLInputElement | null>(null);
+
+const spStateOptions = [
+  { label: '普通', value: 1 },
+  { label: '免费 (Free)', value: 2 },
+  { label: '2X 上传', value: 3 },
+  { label: '2X 免费', value: 4 },
+  { label: '50% 下载', value: 5 },
+  { label: '2X 50%', value: 6 },
+  { label: '30% 下载', value: 7 },
+];
+
+const triggerTorrentUpload = () => {
+  torrentFileInputRef.value?.click();
+};
+
+const formatBytes = (bytes: number) => {
+  if (!bytes || bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+};
+
+const onTorrentFileSelected = async (e: Event) => {
+  const target = e.target as HTMLInputElement;
+  if (!target.files || target.files.length === 0) return;
+  const file = target.files[0];
+  if (!file.name.toLowerCase().endsWith('.torrent')) {
+    window.$message.error('请选择有效的 .torrent 种子文件');
+    target.value = '';
+    return;
+  }
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('sp_state', currentTorrentSpState.value.toString());
+  uploadingTorrent.value = true;
+  try {
+    const res = await uploadTorrent(formData);
+    currentTorrent.value = res;
+    window.$message.success('种子解析并上传成功');
+  } catch (err: any) {
+    window.$message.error(err.message || '上传种子失败');
+  } finally {
+    uploadingTorrent.value = false;
+    target.value = '';
+  }
+};
+
+const handleSpStateChange = async (val: number) => {
+  currentTorrentSpState.value = val;
+  if (currentTorrent.value) {
+    try {
+      await editTorrent({
+        id: currentTorrent.value.id,
+        name: currentTorrent.value.name,
+        sp_state: val,
+      });
+      currentTorrent.value.sp_state = val;
+    } catch (e) {}
+  }
+};
+
+const removeCurrentTorrent = async () => {
+  if (currentTorrent.value) {
+    try {
+      await deleteTorrent(currentTorrent.value.id);
+    } catch (e) {}
+    currentTorrent.value = null;
+  }
+};
 
 const allowTweetVisibility = ref(
   import.meta.env.VITE_ALLOW_TWEET_VISIBILITY.toLowerCase() === 'true',
@@ -607,6 +738,7 @@ const submitPost = () => {
     users: Array.from(new Set(users)),
     attachment_price: +attachmentPrice.value * 100,
     visibility: visitType.value,
+    torrent_id: currentTorrent.value ? currentTorrent.value.id : undefined,
   })
     .then((res) => {
       window.$message.success('发布成功');
@@ -623,6 +755,8 @@ const submitPost = () => {
       imageContents.value = [];
       videoContents.value = [];
       attachmentContents.value = [];
+      currentTorrent.value = null;
+      currentTorrentSpState.value = 1;
       visitType.value = defaultVisitType.value;
     })
     .catch((err) => {
@@ -717,6 +851,52 @@ onMounted(() => {
     margin-left: 42px;
     .n-upload-file-info__thumbnail {
         overflow: hidden;
+    }
+}
+.compose-torrent-card {
+    margin-top: 12px;
+    margin-left: 42px;
+    margin-right: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: rgba(24, 160, 88, 0.08);
+    border: 1px dashed rgba(24, 160, 88, 0.4);
+    border-radius: 8px;
+
+    .compose-torrent-info {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        overflow: hidden;
+        flex: 1;
+
+        .compose-torrent-text {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+
+            .compose-torrent-name {
+                font-size: 13px;
+                font-weight: 500;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .compose-torrent-size {
+                font-size: 11px;
+                opacity: 0.65;
+            }
+        }
+    }
+
+    .compose-torrent-opts {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-left: 12px;
     }
 }
 .dark {

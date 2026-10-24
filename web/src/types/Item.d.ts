@@ -227,6 +227,8 @@ declare namespace Item {
     is_essence: number;
     /** 是否删除：0为未删除，1为已删除 */
     is_del?: 0 | 1;
+    /** 关联的 PT 种子 */
+    torrent?: any;
   }
 
   /** 组件用帖子 */
@@ -283,6 +285,8 @@ declare namespace Item {
     deleted_on?: number;
     /** 是否删除：0为未删除，1为已删除 */
     is_del?: 0 | 1;
+    /** 关联的 PT 种子 */
+    torrent?: any;
   }
 
   interface ContactsItemProps {
@@ -323,6 +327,8 @@ declare namespace Item {
     deleted_on?: number;
     /** 是否删除：0为未删除，1为已删除 */
     is_del?: 0 | 1;
+    /** 关联的 PT 种子 */
+    torrent?: any;
   }
 
   interface TagProps {
@@ -349,6 +355,8 @@ declare namespace Item {
     is_pin?: 0 | 1;
     /** 是否删除：0为未删除，1为已删除 */
     is_del?: 0 | 1;
+    /** 关联的 PT 种子 */
+    torrent?: any;
   }
 
   interface PagerProps {

@@ -68,6 +68,52 @@
                                 泡泡&nbsp;&nbsp;{{ prettyQuoteNum(user.tweets_count || 0) }}
                             </span>
                         </div>
+
+                        <!-- PT 专区公开统计 -->
+                        <div v-if="ptProfile" class="pt-profile-card">
+                            <div class="pt-stat-grid">
+                                <div class="pt-stat-item">
+                                    <span class="pt-label">分享率</span>
+                                    <span class="pt-val ratio" :class="{ warning: ptProfile.downloaded > 0 && ptProfile.ratio < 1 }">
+                                        {{ ptProfile.downloaded === 0 ? '∞' : ptProfile.ratio.toFixed(2) }}
+                                    </span>
+                                </div>
+                                <div class="pt-stat-item">
+                                    <span class="pt-label">上传量</span>
+                                    <span class="pt-val up">{{ formatBytes(ptProfile.uploaded) }}</span>
+                                </div>
+                                <div class="pt-stat-item">
+                                    <span class="pt-label">下载量</span>
+                                    <span class="pt-val down">{{ formatBytes(ptProfile.downloaded) }}</span>
+                                </div>
+                                <div class="pt-stat-item">
+                                    <span class="pt-label">魔力值</span>
+                                    <span class="pt-val bonus">{{ ptProfile.seed_bonus.toFixed(1) }}</span>
+                                </div>
+                                <div class="pt-stat-item">
+                                    <span class="pt-label">当前做种</span>
+                                    <span class="pt-val">{{ ptProfile.seeding_count }}</span>
+                                </div>
+                                <div class="pt-stat-item">
+                                    <span class="pt-label">当前下载</span>
+                                    <span class="pt-val">{{ ptProfile.leech_count }}</span>
+                                </div>
+                            </div>
+                            <div class="pt-tracker-row" v-if="ptProfile.http_tracker_url || ptProfile.ws_tracker_url">
+                                <div class="tracker-item" v-if="ptProfile.http_tracker_url">
+                                    <span class="tracker-tag http">HTTP</span>
+                                    <span class="tracker-title">HTTP Tracker:</span>
+                                    <span class="tracker-url" :title="ptProfile.http_tracker_url">{{ ptProfile.http_tracker_url }}</span>
+                                    <n-button size="tiny" quaternary type="primary" @click="copyText(ptProfile.http_tracker_url, 'HTTP Tracker 地址已复制')">复制</n-button>
+                                </div>
+                                <div class="tracker-item" v-if="ptProfile.ws_tracker_url">
+                                    <span class="tracker-tag ws">WS</span>
+                                    <span class="tracker-title">WebSocket Tracker (WebTorrent):</span>
+                                    <span class="tracker-url" :title="ptProfile.ws_tracker_url">{{ ptProfile.ws_tracker_url }}</span>
+                                    <n-button size="tiny" quaternary type="primary" @click="copyText(ptProfile.ws_tracker_url, 'WebSocket Tracker 地址已复制')">复制</n-button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="user-opts" v-if="userInfo.id > 0">
@@ -154,6 +200,8 @@ import { useStoreProfile } from '@/store/profile';
 import { storeToRefs } from 'pinia';
 import { Api } from '@/utils/request';
 import UserAction from '@/composables/useUserAction';
+import { getUserPTProfile, type UserPTProfile } from '@/api/pt';
+import copy from 'copy-to-clipboard';
 
 type PageType = 'post' | 'comment' | 'highlight' | 'media' | 'star';
 
@@ -257,7 +305,35 @@ function updateFolloing(
 	}
 }
 
+const ptProfile = ref<UserPTProfile | null>(null);
+
+const formatBytes = (bytes: number) => {
+  if (!bytes || bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+};
+
+const copyText = (txt?: string, tip?: string) => {
+  if (txt) {
+    copy(txt);
+    window.$message.success(tip || '已复制');
+  }
+};
+
+const loadPTProfile = async (uid?: number) => {
+  if (!uid) return;
+  try {
+    const res = await getUserPTProfile(uid);
+    ptProfile.value = res;
+  } catch (e) {
+    // ignore
+  }
+};
+
 const reset = () => {
+	ptProfile.value = null;
 	noMore.value = false;
 	list.value = [];
 	postList.value = [];
@@ -356,6 +432,7 @@ const loadUser = () => {
         user.tweets_count = res.tweets_count;
       }
       loadPage();
+      loadPTProfile(res.id);
     })
     .catch((err) => {
       userLoading.value = false;
@@ -616,6 +693,107 @@ watch(
 
         .top-tag {
             transform: scale(0.75);
+        }
+
+        .pt-profile-card {
+            margin-top: 14px;
+            padding: 10px 14px;
+            background: rgba(128, 128, 128, 0.06);
+            border-radius: 8px;
+            border: 1px solid rgba(128, 128, 128, 0.12);
+
+            .pt-stat-grid {
+                display: grid;
+                grid-template-columns: repeat(6, 1fr);
+                gap: 8px;
+                text-align: center;
+
+                @media (max-width: 640px) {
+                    grid-template-columns: repeat(3, 1fr);
+                    row-gap: 10px;
+                }
+
+                .pt-stat-item {
+                    display: flex;
+                    flex-direction: column;
+
+                    .pt-label {
+                        font-size: 11px;
+                        opacity: 0.65;
+                        margin-bottom: 2px;
+                    }
+
+                    .pt-val {
+                        font-size: 13px;
+                        font-weight: 600;
+
+                        &.up {
+                            color: #18a058;
+                        }
+                        &.down {
+                            color: #d03050;
+                        }
+                        &.bonus {
+                            color: #f0a020;
+                        }
+                        &.ratio {
+                            color: #2080f0;
+                            &.warning {
+                                color: #d03050;
+                            }
+                        }
+                    }
+                }
+            }
+
+            .pt-tracker-row {
+                margin-top: 8px;
+                padding-top: 8px;
+                border-top: 1px dashed rgba(128, 128, 128, 0.15);
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+                font-size: 12px;
+
+                .tracker-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    overflow: hidden;
+
+                    .tracker-tag {
+                        font-size: 10px;
+                        font-weight: 700;
+                        padding: 1px 4px;
+                        border-radius: 3px;
+                        &.http {
+                            background: rgba(32, 128, 240, 0.15);
+                            color: #2080f0;
+                        }
+                        &.ws {
+                            background: rgba(24, 160, 88, 0.15);
+                            color: #18a058;
+                        }
+                    }
+
+                    .tracker-title {
+                        font-weight: 500;
+                        opacity: 0.7;
+                        white-space: nowrap;
+                    }
+
+                    .tracker-url {
+                        flex: 1;
+                        font-family: monospace;
+                        background: rgba(128, 128, 128, 0.1);
+                        padding: 2px 6px;
+                        border-radius: 4px;
+                        white-space: nowrap;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                    }
+                }
+            }
         }
     }
 

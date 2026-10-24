@@ -7,6 +7,7 @@ package web
 import (
 	"fmt"
 
+	"github.com/alimy/tryst/cfg"
 	"github.com/gin-gonic/gin"
 	api "github.com/rocboss/paopao-ce/auto/api/v1"
 	"github.com/rocboss/paopao-ce/internal/conf"
@@ -519,6 +520,12 @@ func (s *looseSrv) TweetDetail(req *web.TweetDetailReq) (*web.TweetDetailResp, e
 	for _, content := range postContents {
 		if content.PostID == post.ID {
 			postFormated.Contents = append(postFormated.Contents, content.Format())
+		}
+	}
+	if cfg.If("PT") {
+		torrents, _ := s.Ds.GetTorrentsByPostIDs([]int64{post.ID})
+		if len(torrents) > 0 {
+			postFormated.Torrent = torrents[post.ID]
 		}
 	}
 	if err = s.PrepareTweet(req.User, postFormated); err != nil {

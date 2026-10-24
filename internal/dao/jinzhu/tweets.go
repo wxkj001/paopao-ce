@@ -9,10 +9,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alimy/tryst/cfg"
 	"github.com/rocboss/paopao-ce/internal/core"
 	"github.com/rocboss/paopao-ce/internal/core/cs"
 	"github.com/rocboss/paopao-ce/internal/core/ms"
 	"github.com/rocboss/paopao-ce/internal/dao/jinzhu/dbr"
+	"github.com/rocboss/paopao-ce/internal/model/pt"
 	"github.com/rocboss/paopao-ce/pkg/debug"
 	"gorm.io/gorm"
 )
@@ -109,14 +111,43 @@ func (s *tweetHelpSrv) MergePosts(posts []*ms.Post) ([]*ms.PostFormated, error) 
 	}
 
 	// 数据整合
+	var torrentMap map[int64]*pt.Torrent
+	if cfg.If("PT") && len(postIds) > 0 {
+		var torrents []pt.Torrent
+		if s.db.Where("post_id IN ? AND status = ?", postIds, pt.TorrentStatusNormal).Find(&torrents).Error == nil {
+			torrentMap = make(map[int64]*pt.Torrent, len(torrents))
+			for i := range torrents {
+				torrentMap[torrents[i].PostID] = &torrents[i]
+			}
+		}
+	}
+
 	postsFormated := make([]*dbr.PostFormated, 0, len(posts))
 	for _, post := range posts {
 		postFormated := post.Format()
 		postFormated.User = userMap[post.UserID]
 		postFormated.Contents = contentMap[post.ID]
+		if torrentMap != nil {
+			postFormated.Torrent = torrentMap[post.ID]
+		}
 		postsFormated = append(postsFormated, postFormated)
 	}
 	return postsFormated, nil
+}
+
+func (s *tweetHelpSrv) GetTorrentsByPostIDs(postIDs []int64) (map[int64]*pt.Torrent, error) {
+	if !cfg.If("PT") || len(postIDs) == 0 {
+		return nil, nil
+	}
+	var torrents []pt.Torrent
+	if err := s.db.Where("post_id IN ? AND status = ?", postIDs, pt.TorrentStatusNormal).Find(&torrents).Error; err != nil {
+		return nil, err
+	}
+	torrentMap := make(map[int64]*pt.Torrent, len(torrents))
+	for i := range torrents {
+		torrentMap[torrents[i].PostID] = &torrents[i]
+	}
+	return torrentMap, nil
 }
 
 // RevampPosts post数据整形修复
@@ -148,10 +179,24 @@ func (s *tweetHelpSrv) RevampPosts(posts []*ms.PostFormated) ([]*ms.PostFormated
 		contentMap[content.PostID] = append(contentMap[content.PostID], content.Format())
 	}
 
+	var torrentMap map[int64]*pt.Torrent
+	if cfg.If("PT") && len(postIds) > 0 {
+		var torrents []pt.Torrent
+		if s.db.Where("post_id IN ? AND status = ?", postIds, pt.TorrentStatusNormal).Find(&torrents).Error == nil {
+			torrentMap = make(map[int64]*pt.Torrent, len(torrents))
+			for i := range torrents {
+				torrentMap[torrents[i].PostID] = &torrents[i]
+			}
+		}
+	}
+
 	// 数据整合
 	for _, post := range posts {
 		post.User = userMap[post.UserID]
 		post.Contents = contentMap[post.ID]
+		if torrentMap != nil {
+			post.Torrent = torrentMap[post.ID]
+		}
 	}
 	return posts, nil
 }
@@ -191,6 +236,10 @@ func (s *tweetManageSrv) CreatePostContent(content *ms.PostContent) (*ms.PostCon
 func (s *tweetManageSrv) CreateAttachment(obj *ms.Attachment) (int64, error) {
 	attachment, err := obj.Create(s.db)
 	return attachment.ID, err
+}
+
+func (s *tweetManageSrv) BindTorrentPost(torrentID uint64, postID int64) error {
+	return s.db.Model(&pt.Torrent{}).Where("id = ?", torrentID).Update("post_id", postID).Error
 }
 
 func (s *tweetManageSrv) CreatePost(post *ms.Post) (*ms.Post, error) {

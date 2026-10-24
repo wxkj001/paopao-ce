@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rocboss/paopao-ce/internal/model/pt"
 	"gorm.io/gorm"
 )
 
@@ -62,6 +63,7 @@ type PostFormated struct {
 	Tags            map[string]int8        `json:"tags"`
 	AttachmentPrice int64                  `json:"attachment_price"`
 	IPLoc           string                 `json:"ip_loc"`
+	Torrent         *pt.Torrent            `json:"torrent,omitempty"`
 }
 
 func (t PostVisibleT) ToOutValue() (res uint8) {

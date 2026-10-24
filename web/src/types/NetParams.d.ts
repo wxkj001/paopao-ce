@@ -44,6 +44,8 @@ declare namespace NetParams {
     id: number;
     /** 可见性：0为公开，1为私密，2为好友可见 */
     visibility: import('@/utils/IEnum').VisibilityEnum;
+    /** 关联的 PT 种子ID */
+    torrent_id?: number;
   }
 
   interface PostGetPostStar {
@@ -86,6 +88,8 @@ declare namespace NetParams {
     attachment_price: number;
     /** 可见性：0为公开，1为私密，2为好友可见 */
     visibility: import('@/utils/IEnum').VisibilityEnum;
+    /** 关联的 PT 种子ID */
+    torrent_id?: number;
   }
 
   interface PostDeletePost {

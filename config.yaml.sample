@@ -57,3 +57,11 @@ LocalOSS:
   Secure: false
   Bucket: paopao
   Domain: 127.0.0.1:8008
+
+PT:
+  AnnounceUrl: "http://127.0.0.1:8008/tracker/announce"
+  WsAnnounceUrl: "ws://127.0.0.1:8008/tracker/ws"
+  AnnounceInterval: 1800
+  MinInterval: 300
+  SiteSource: "[PaoPao] PaoPao PT"
+  StoragePath: "custom/data/paopao-ce/torrents"

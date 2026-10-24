@@ -19,26 +19,28 @@ export function usePostContent(post: Item.PostProps, includeExtraFields: boolean
         },
         post,
       );
-      postData.contents.map((content) => {
-        if (+content.type === 1 || +content.type === 2) {
-          postData.texts.push(content);
-        }
-        if (+content.type === 3) {
-          postData.imgs.push(content);
-        }
-        if (+content.type === 4) {
-          postData.videos.push(content);
-        }
-        if (+content.type === 6) {
-          postData.links.push(content);
-        }
-        if (+content.type === 7) {
-          postData.attachments.push(content);
-        }
-        if (+content.type === 8) {
-          postData.charge_attachments.push(content);
-        }
-      });
+      if (postData.contents && Array.isArray(postData.contents)) {
+        postData.contents.map((content) => {
+          if (+content.type === 1 || +content.type === 2) {
+            postData.texts.push(content);
+          }
+          if (+content.type === 3) {
+            postData.imgs.push(content);
+          }
+          if (+content.type === 4) {
+            postData.videos.push(content);
+          }
+          if (+content.type === 6) {
+            postData.links.push(content);
+          }
+          if (+content.type === 7) {
+            postData.attachments.push(content);
+          }
+          if (+content.type === 8) {
+            postData.charge_attachments.push(content);
+          }
+        });
+      }
       return postData;
     },
     set: (newVal) => {

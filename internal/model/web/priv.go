@@ -57,6 +57,7 @@ type CreateTweetReq struct {
 	Users           []string           `json:"users" binding:"required"`
 	AttachmentPrice int64              `json:"attachment_price"`
 	Visibility      TweetVisibleType   `json:"visibility"`
+	TorrentID       uint64             `json:"torrent_id"`
 	ClientIP        string             `json:"-" binding:"-"`
 }
 

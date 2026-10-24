@@ -7,6 +7,7 @@ package core
 import (
 	"github.com/rocboss/paopao-ce/internal/core/cs"
 	"github.com/rocboss/paopao-ce/internal/core/ms"
+	"github.com/rocboss/paopao-ce/internal/model/pt"
 )
 
 // TweetService 推文检索服务
@@ -48,12 +49,14 @@ type TweetManageService interface {
 	DeletePostCollection(p *ms.PostCollection) error
 	CreatePostContent(content *ms.PostContent) (*ms.PostContent, error)
 	CreateAttachment(obj *ms.Attachment) (int64, error)
+	BindTorrentPost(torrentID uint64, postID int64) error
 }
 
 // TweetHelpService 推文辅助服务
 type TweetHelpService interface {
 	RevampPosts(posts []*ms.PostFormated) ([]*ms.PostFormated, error)
 	MergePosts(posts []*ms.Post) ([]*ms.PostFormated, error)
+	GetTorrentsByPostIDs(postIDs []int64) (map[int64]*pt.Torrent, error)
 }
 
 // TweetServantA 推文检索服务(版本A)

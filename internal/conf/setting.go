@@ -318,6 +318,15 @@ type WebProfileConf struct {
 	CopyrightRightLink        string `json:"copyright_right_link"`
 }
 
+type ptConf struct {
+	AnnounceURL      string `json:"announce_url"`
+	WsAnnounceURL    string `json:"ws_announce_url"`
+	AnnounceInterval int    `json:"announce_interval"`
+	MinInterval      int    `json:"min_interval"`
+	SiteSource       string `json:"site_source"`
+	StoragePath      string `json:"storage_path"`
+}
+
 func (s *httpServerConf) GetReadTimeout() time.Duration {
 	return s.ReadTimeout * time.Second
 }

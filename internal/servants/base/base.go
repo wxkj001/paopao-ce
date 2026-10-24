@@ -11,6 +11,7 @@ import (
 	"net/http"
 
 	"github.com/alimy/mir/v5"
+	"github.com/alimy/tryst/cfg"
 	"github.com/cockroachdb/errors"
 	"github.com/getsentry/sentry-go"
 	sentrygin "github.com/getsentry/sentry-go/gin"
@@ -302,6 +303,12 @@ func (s *DaoServant) GetTweetBy(id int64) (*ms.PostFormated, error) {
 	for _, content := range postContents {
 		if content.PostID == post.ID {
 			postFormated.Contents = append(postFormated.Contents, content.Format())
+		}
+	}
+	if cfg.If("PT") {
+		torrents, _ := s.Ds.GetTorrentsByPostIDs([]int64{post.ID})
+		if len(torrents) > 0 {
+			postFormated.Torrent = torrents[post.ID]
 		}
 	}
 	return postFormated, nil

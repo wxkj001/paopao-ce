@@ -45,6 +45,15 @@
                     >
                         好友可见
                     </n-tag>
+                    <n-tag
+                        v-if="post.torrent && post.torrent.sp_state > 1"
+                        class="top-tag"
+                        :type="getSpType(post.torrent.sp_state)"
+                        size="small"
+                        round
+                    >
+                        {{ getSpLabel(post.torrent.sp_state) }}
+                    </n-tag>
                     <div v-if="isMobile">
                         <span class="timestamp-mobile">
                             {{ formatPrettyDate(post.created_on) }} {{ post.ip_loc }}
@@ -111,6 +120,9 @@
                 <post-link
                     v-if="post.links.length > 0"
                     :links="post.links" />
+                <post-torrent
+                    v-if="post.torrent"
+                    :torrent="post.torrent" />
             </template>
             <template #action>
                 <n-space justify="space-between">
@@ -166,6 +178,7 @@ import { storeToRefs } from 'pinia';
 import { Api } from '@/utils/request';
 import UserAction from '@/composables/useUserAction';
 import { usePostContent } from '@/composables/usePostContent';
+import { getSpLabel, getSpType } from '@/api/pt';
 
 const router = useRouter();
 

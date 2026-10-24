@@ -271,6 +271,12 @@ func (s *privSrv) CreateTweet(req *web.CreateTweetReq) (_ *web.CreateTweetResp, 
 		return nil, web.ErrCreatePostFailed
 	}
 
+	if req.TorrentID > 0 {
+		if err := s.Ds.BindTorrentPost(req.TorrentID, post.ID); err != nil {
+			logrus.Warnf("bind torrent post err: %s", err)
+		}
+	}
+
 	// 创建推文内容
 	for _, item := range req.Contents {
 		if err := item.Check(s.Ds); err != nil {
