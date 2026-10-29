@@ -49,10 +49,13 @@
           </div>
 
           <div class="action-bar">
-            <n-button type="primary" size="large" @click="downloadTorrent">
+            <n-button v-if="canDownload" type="primary" size="large" @click="downloadTorrent">
               <template #icon><n-icon><arrow-down-circle-outline /></n-icon></template>
               下载种子 (.torrent)
             </n-button>
+            <div v-else-if="userStore.userLogined" class="download-forbidden-tip" style="color: #faad14; font-size: 13px;">
+              当前用户等级暂无下载权限
+            </div>
             <div class="hash-display">
               <span class="hash-label">Info Hash:</span>
               <code class="hash-code">{{ torrent.info_hash }}</code>
@@ -151,9 +154,24 @@ import {
   TorrentFile,
   TorrentPeer,
 } from '@/api/pt';
+import { useStoreUser } from '@/store/user';
 
 const route = useRoute();
 const router = useRouter();
+const userStore = useStoreUser();
+
+const canDownload = computed(() => {
+  if (!userStore.userLogined) return false;
+  if (userStore.userInfo?.is_admin) return true;
+  const prof = userStore.userPTProfile;
+  if (!prof) return false;
+  if (!prof.can_leech) return false;
+  if (prof.can_download === false) return false;
+  if (prof.class === 0) {
+    return torrent.value?.sp_state === 2 || torrent.value?.sp_state === 4;
+  }
+  return true;
+});
 
 const loading = ref(false);
 const torrent = ref<TorrentItem | null>(null);
@@ -198,6 +216,9 @@ const downloadTorrent = () => {
 };
 
 onMounted(async () => {
+  if (userStore.userLogined && !userStore.userPTProfile) {
+    userStore.loadUserPTProfile();
+  }
   const id = Number(route.query.id);
   if (!id) {
     router.replace('/pt');

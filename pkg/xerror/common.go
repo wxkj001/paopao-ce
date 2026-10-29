@@ -15,6 +15,7 @@ var (
 	UnauthorizedTokenTimeout  = NewError(10006, "鉴权失败，Token 超时")
 	UnauthorizedTokenGenerate = NewError(10007, "鉴权失败，Token 生成失败")
 	TooManyRequests           = NewError(10008, "请求过多")
+	AccessDenied              = NewError(10009, "权限不足，操作被拒绝")
 
 	GatewayMethodsLimit    = NewError(10109, "网关仅接受GET或POST请求")
 	GatewayLostSign        = NewError(10110, "网关请求缺少签名")

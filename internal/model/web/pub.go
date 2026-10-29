@@ -25,8 +25,9 @@ type LoginResp struct {
 }
 
 type RegisterReq struct {
-	Username string `json:"username" form:"username" binding:"required"`
-	Password string `json:"password" form:"password" binding:"required"`
+	Username   string `json:"username" form:"username" binding:"required"`
+	Password   string `json:"password" form:"password" binding:"required"`
+	InviteCode string `json:"invite_code" form:"invite_code"`
 }
 
 type RegisterResp struct {

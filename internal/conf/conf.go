@@ -59,6 +59,7 @@ var (
 	MinIOSetting            *minioConf
 	S3Setting               *s3Conf
 	LocalOSSSetting         *localossConf
+	TelegramOSSSetting      *TelegramOSSConf
 	JWTSetting              *jwtConf
 	AdminSettingsSetting    *adminSettingsConf
 	WebProfileSetting       *WebProfileConf
@@ -124,6 +125,7 @@ func setupSetting(suite []string, noDefault bool) error {
 		"HuaweiOBS":         &HuaweiOBSSetting,
 		"MinIO":             &MinIOSetting,
 		"LocalOSS":          &LocalOSSSetting,
+		"TelegramOSS":       &TelegramOSSSetting,
 		"S3":                &S3Setting,
 		"WebProfile":        &WebProfileSetting,
 		"PT":                &PTSetting,
@@ -187,6 +189,11 @@ func GetOssDomain() string {
 			uri = "http://"
 		}
 		return uri + LocalOSSSetting.Domain + "/oss/" + LocalOSSSetting.Bucket + "/"
+	} else if cfg.If("TelegramOSS") {
+		if !TelegramOSSSetting.Secure {
+			uri = "http://"
+		}
+		return uri + TelegramOSSSetting.Domain + "/tgoss/"
 	}
 	return uri + AliOSSSetting.Domain + "/"
 }

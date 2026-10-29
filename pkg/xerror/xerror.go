@@ -101,6 +101,8 @@ func HttpStatusCode(e error) (statusCode int, code int) {
 		statusCode = http.StatusUnauthorized
 	case TooManyRequests.StatusCode():
 		statusCode = http.StatusTooManyRequests
+	case AccessDenied.StatusCode():
+		statusCode = http.StatusForbidden
 	}
 	return
 }

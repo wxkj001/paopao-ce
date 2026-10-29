@@ -69,6 +69,7 @@ import {
   SettingsOutline,
   GiftOutline,
   ConstructOutline,
+  ShieldCheckmarkOutline,
   LogOutOutline,
 } from '@vicons/ionicons5';
 import { Hash } from '@vicons/tabler';
@@ -203,6 +204,12 @@ const menuOptions = computed(() => {
     href: '/setting',
   });
   if (userInfo.value.is_admin) {
+    options.push({
+      label: 'PT 用户管理',
+      key: 'admin-pt-users',
+      icon: () => h(ShieldCheckmarkOutline),
+      href: '/admin/pt-users',
+    });
     options.push({
       label: '系统配置',
       key: 'admin-settings',

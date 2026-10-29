@@ -154,6 +154,7 @@
 
             <div class="card-actions" @click.stop>
               <n-button
+                v-if="canDownloadTorrent(item)"
                 type="primary"
                 secondary
                 size="small"
@@ -315,6 +316,19 @@ const handleResetPasskey = () => {
       }
     },
   });
+};
+
+const canDownloadTorrent = (item: TorrentItem) => {
+  if (!userStore.userLogined) return false;
+  if (userStore.userInfo?.is_admin) return true;
+  const prof = userProfile.value || userStore.userPTProfile;
+  if (!prof) return false;
+  if (!prof.can_leech) return false;
+  if (prof.can_download === false) return false;
+  if (prof.class === 0) {
+    return item.sp_state === 2 || item.sp_state === 4;
+  }
+  return true;
 };
 
 const downloadTorrent = (id: number) => {

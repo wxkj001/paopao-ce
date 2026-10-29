@@ -228,6 +228,24 @@ LocalOSS: # 本地文件OSS存储配置
   Secure: False
   Bucket: paopao
   Domain: 127.0.0.1:8008
+TelegramOSS: # Telegram频道对象存储配置
+  Endpoint: "http://127.0.0.1:8081" # 本地 TG Bot API 地址；官方请填 "https://api.telegram.org"
+  Token: "" # Telegram Bot Token
+  Proxy: "" # 可选 HTTP/SOCKS5 代理，例如 "socks5://127.0.0.1:1080"
+  Domain: "127.0.0.1:8008" # 媒体对外访问域名/地址
+  Secure: False
+  LocalMode: False # 若为本地 telegram-bot-api 的 --local 模式可开启直接读取本地文件
+  SecretKey: "" # 可选，用于 Token 签名防篡改
+  ChannelStrategy: "round-robin" # 多频道分发策略: round-robin | random | weight
+  Channels: # 存储频道列表
+    - Id: "-1001234567890"
+      Name: "MainStorageA"
+      Weight: 10
+  Cache: # 媒体流式代理本地缓存
+    Enabled: True
+    SavePath: "custom/data/paopao-ce/tgcache"
+    MaxSizeMB: 4096
+    MaxAgeDays: 30
 Database: # Database通用配置
   LogLevel: error   # 日志级别 silent|error|warn|info
   TablePrefix: p_   # 表名前缀
@@ -267,6 +285,7 @@ WebProfile:
   AllowTweetVideo: true            # 是否允许视频推文
   AllowUserRegister: true          # 是否允许用户注册
   AllowPhoneBind: true             # 是否允许手机绑定
+  RequireInviteRegister: false     # 是否强制邀请码注册，开启后必须有邀请码才能注册
   DefaultTweetMaxLength: 2000      # 推文允许输入的最大长度， 默认2000字，值的范围需要查询后端支持的最大字数
   TweetWebEllipsisSize: 400        # Web端推文作为feed显示的最长字数，默认400字
   TweetMobileEllipsisSize: 300     # 移动端推文作为feed显示的最长字数，默认300字
@@ -284,3 +303,23 @@ PT:
   MinInterval: 300
   SiteSource: "[PaoPao] PaoPao PT"
   StoragePath: "custom/data/paopao-ce/torrents"
+  Authority:
+    PromotionInterval: 3600
+    ClassNames:
+      0: "贫民"
+      1: "普通会员"
+      2: "进阶用户"
+      3: "精英用户"
+      4: "疯狂用户"
+      5: "疯魔用户"
+      6: "骨灰用户"
+      7: "极品用户"
+      8: "巅峰用户"
+      9: "大师用户"
+      10: "VIP"
+      11: "养老退役"
+      12: "发布员"
+      13: "版主"
+      14: "管理员"
+      15: "技术主管"
+      16: "站长"

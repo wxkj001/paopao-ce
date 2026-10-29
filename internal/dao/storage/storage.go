@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -19,6 +20,7 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/rocboss/paopao-ce/internal/conf"
 	"github.com/rocboss/paopao-ce/internal/core"
+	"github.com/rocboss/paopao-ce/pkg/telegram"
 	"github.com/sirupsen/logrus"
 	"github.com/tencentyun/cos-go-sdk-v5"
 )
@@ -272,5 +274,49 @@ func MustS3Service() (core.ObjectStorageService, core.VersionInfo) {
 		bucket:           conf.S3Setting.Bucket,
 		domain:           domain,
 	}
+	return obj, obj
+}
+
+func MustTelegramService() (core.ObjectStorageService, core.VersionInfo) {
+	s := conf.TelegramOSSSetting
+	if s == nil {
+		logrus.Fatalf("storage.MustTelegramService: TelegramOSS configuration is nil")
+	}
+
+	client, err := telegram.NewClient(telegram.ClientConfig{
+		Endpoint:  s.Endpoint,
+		Token:     s.Token,
+		Proxy:     s.Proxy,
+		LocalMode: s.LocalMode,
+	})
+	if err != nil {
+		logrus.Fatalf("storage.MustTelegramService create telegram client failed: %s", err)
+	}
+
+	channelConfigs := make([]telegram.ChannelConfig, 0, len(s.Channels))
+	for _, ch := range s.Channels {
+		channelConfigs = append(channelConfigs, telegram.ChannelConfig{
+			ID:     ch.Id,
+			Name:   ch.Name,
+			Weight: ch.Weight,
+		})
+	}
+
+	pool, err := telegram.NewChannelPool(channelConfigs, telegram.Strategy(s.ChannelStrategy))
+	if err != nil {
+		logrus.Fatalf("storage.MustTelegramService create channel pool failed: %s", err)
+	}
+
+	cachePath := ""
+	if s.Cache.Enabled && s.Cache.SavePath != "" {
+		cachePath, err = filepath.Abs(s.Cache.SavePath)
+		if err != nil {
+			logrus.Fatalf("storage.MustTelegramService resolve cache path err: %s", err)
+		}
+		_ = os.MkdirAll(cachePath, 0o750)
+	}
+
+	domain := conf.GetOssDomain()
+	obj := newTelegramServant(client, pool, domain, s.SecretKey, cachePath)
 	return obj, obj
 }

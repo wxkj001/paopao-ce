@@ -26,6 +26,26 @@
                             <n-tag v-if="user.is_admin" class="top-tag" type="error" size="small" round>
                                 管理员
                             </n-tag>
+                            <n-tag
+                                v-if="ptProfile?.class_name"
+                                class="top-tag pt-class-badge"
+                                size="small"
+                                round
+                                strong
+                                :color="{ color: ptProfile.class_color, textColor: '#fff' }"
+                            >
+                                {{ ptProfile.class === 10 ? '👑 ' : '' }}{{ ptProfile.class_name }}
+                            </n-tag>
+                            <n-tag
+                                v-if="ptProfile?.custom_title"
+                                class="top-tag pt-custom-title"
+                                type="info"
+                                size="small"
+                                round
+                                secondary
+                            >
+                                {{ ptProfile.custom_title }}
+                            </n-tag>
                         </div>
                         <div class="userinfo">
                             <span class="info-item">UID. {{ user.id }} </span>
@@ -97,6 +117,10 @@
                                 <div class="pt-stat-item">
                                     <span class="pt-label">当前下载</span>
                                     <span class="pt-val">{{ ptProfile.leech_count }}</span>
+                                </div>
+                                <div class="pt-stat-item" v-if="userInfo.id === user.id">
+                                    <span class="pt-label">邀请名额</span>
+                                    <span class="pt-val bonus">{{ ptProfile.invites || 0 }}</span>
                                 </div>
                             </div>
                             <div class="pt-tracker-row" v-if="ptProfile.http_tracker_url || ptProfile.ws_tracker_url">
@@ -704,7 +728,7 @@ watch(
 
             .pt-stat-grid {
                 display: grid;
-                grid-template-columns: repeat(6, 1fr);
+                grid-template-columns: repeat(auto-fit, minmax(65px, 1fr));
                 gap: 8px;
                 text-align: center;
 

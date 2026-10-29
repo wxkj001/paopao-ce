@@ -6,6 +6,7 @@ package web
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/alimy/tryst/cfg"
 	"github.com/gin-gonic/gin"
@@ -50,9 +51,17 @@ func (s *looseSrv) Timeline(req *web.TimelineReq) (*web.TimelineResp, error) {
 		Type:  core.SearchType(req.Type),
 	}
 	res, err := s.Ts.Search(req.User, q, offset, limit)
-	if err != nil {
-		logrus.Errorf("Ts.Search err: %s", err)
-		return nil, web.ErrGetPostsFailed
+	if err != nil || (res != nil && res.Total == 0) {
+		if err != nil {
+			logrus.Warnf("Ts.Search err: %s, fallback to database search", err)
+		}
+		dbRes, dbErr := s.searchTweetsFromDB(req, limit, offset)
+		if dbErr == nil && dbRes != nil && dbRes.Data != nil && dbRes.Data.Pager.TotalRows > 0 {
+			return dbRes, nil
+		}
+		if err != nil {
+			return dbRes, dbErr
+		}
 	}
 	posts, err := s.Ds.RevampPosts(res.Items)
 	if err != nil {
@@ -123,6 +132,71 @@ func (s *looseSrv) getIndexTweets(req *web.TimelineReq, limit int, offset int) (
 	resp := joint.PageRespFrom(postsFormated, req.Page, req.PageSize, total)
 	// 缓存处理
 	base.OnCacheRespEvent(s.ac, key, resp, s.idxTweetsExpire)
+	return &web.TimelineResp{
+		CachePageResp: joint.CachePageResp{
+			Data: resp,
+		},
+	}, nil
+}
+
+func (s *looseSrv) searchTweetsFromDB(req *web.TimelineReq, limit, offset int) (*web.TimelineResp, error) {
+	db := conf.MustGormDB()
+	query := strings.TrimSpace(req.Query)
+	if query == "" {
+		return s.getIndexTweets(req, limit, offset)
+	}
+
+	var posts []*ms.Post
+	var total int64
+
+	tx := db.Model(&dbr.Post{}).Where("is_del = ?", 0)
+
+	// Visibility filter
+	if req.User != nil {
+		tx = tx.Where("user_id = ? OR visibility >= ?", req.User.ID, dbr.PostVisitPublic)
+	} else {
+		tx = tx.Where("visibility >= ?", dbr.PostVisitPublic)
+	}
+
+	if req.Type == "tag" {
+		pattern := "%" + query + "%"
+		tx = tx.Where("tags LIKE ?", pattern)
+	} else {
+		pattern := "%" + query + "%"
+		subQuery := db.Model(&dbr.PostContent{}).Select("post_id").Where("is_del = 0 AND content LIKE ?", pattern)
+		tx = tx.Where("tags LIKE ? OR id IN (?)", pattern, subQuery)
+	}
+
+	if err := tx.Count(&total).Error; err != nil {
+		logrus.Errorf("searchTweetsFromDB count err: %v", err)
+		return nil, web.ErrGetPostsFailed
+	}
+
+	if offset >= 0 && limit > 0 {
+		tx = tx.Offset(offset).Limit(limit)
+	}
+
+	if err := tx.Order("is_top DESC, latest_replied_on DESC, id DESC").Find(&posts).Error; err != nil {
+		logrus.Errorf("searchTweetsFromDB find err: %v", err)
+		return nil, web.ErrGetPostsFailed
+	}
+
+	postsFormated, err := s.Ds.MergePosts(posts)
+	if err != nil {
+		logrus.Errorf("searchTweetsFromDB MergePosts err: %v", err)
+		return nil, web.ErrGetPostsFailed
+	}
+
+	userId := int64(-1)
+	if req.User != nil {
+		userId = req.User.ID
+	}
+	if err := s.PrepareTweets(userId, postsFormated); err != nil {
+		logrus.Errorf("searchTweetsFromDB PrepareTweets err: %v", err)
+		return nil, web.ErrGetPostsFailed
+	}
+
+	resp := joint.PageRespFrom(postsFormated, req.Page, req.PageSize, total)
 	return &web.TimelineResp{
 		CachePageResp: joint.CachePageResp{
 			Data: resp,

@@ -104,6 +104,8 @@ func initOSS() {
 		return
 	} else if cfg.If("LocalOSS") {
 		oss, v = storage.MustLocalossService()
+	} else if cfg.If("TelegramOSS") {
+		oss, v = storage.MustTelegramService()
 	} else {
 		// default use AliOSS as object storage service
 		oss, v = storage.MustAliossService()

@@ -44,7 +44,8 @@ service.interceptors.response.use(
 				useStoreMain().triggerAuth(true);
 			}
 		} else {
-			window.$message.error(response?.data?.msg || '请求失败');
+			const errMsg = response?.data?.details?.[0] || response?.data?.msg || '请求失败';
+			window.$message.error(errMsg);
 		}
 		return Promise.reject(response?.data || {});
 	},

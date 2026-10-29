@@ -12,6 +12,7 @@ export const useStoreProfile = defineStore("profile", () => {
         allowTweetVideo: true,
         allowUserRegister: true,
         allowPhoneBind: true,
+        requireInviteRegister: false,
         defaultTweetMaxLength: 2000,
         tweetWebEllipsisSize: 400,
         tweetMobileEllipsisSize: 300,
@@ -48,6 +49,9 @@ export const useStoreProfile = defineStore("profile", () => {
 
         profile.value.allowPhoneBind =
             import.meta.env.VITE_ALLOW_PHONE_BIND.toLowerCase() === 'true';
+
+        profile.value.requireInviteRegister =
+            (import.meta.env.VITE_REQUIRE_INVITE_REGISTER || '').toLowerCase() === 'true';
 
         profile.value.defaultTweetMaxLength = Number(
             import.meta.env.VITE_DEFAULT_TWEET_MAX_LENGTH,
@@ -97,6 +101,9 @@ export const useStoreProfile = defineStore("profile", () => {
             data.allow_user_register ?? profile.value.allowUserRegister;
 
         profile.value.allowPhoneBind = data.allow_phone_bind ?? profile.value.allowPhoneBind;
+
+        profile.value.requireInviteRegister =
+            data.require_invite_register ?? profile.value.requireInviteRegister;
 
         profile.value.defaultTweetMaxLength =
             data.default_tweet_max_length ?? profile.value.defaultTweetMaxLength;

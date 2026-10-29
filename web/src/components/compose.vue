@@ -161,7 +161,7 @@
                             </template>
                         </n-button>
 
-                        <n-tooltip trigger="hover">
+                        <n-tooltip trigger="hover" v-if="userCanUploadTorrent">
                             <template #trigger>
                                 <n-button
                                     :loading="uploadingTorrent"
@@ -181,6 +181,7 @@
                             添加 PT 种子 (.torrent)
                         </n-tooltip>
                         <input
+                            v-if="userCanUploadTorrent"
                             ref="torrentFileInputRef"
                             type="file"
                             accept=".torrent"
@@ -249,7 +250,7 @@
                     <div class="compose-torrent-opts">
                         <n-select
                             v-model:value="currentTorrentSpState"
-                            :options="spStateOptions"
+                            :options="filteredSpStateOptions"
                             size="small"
                             style="width: 120px"
                             @update:value="handleSpStateChange"
@@ -328,7 +329,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useStoreMain } from '@/store/main';
 import { TOKEN_KEY, useStoreUser } from '@/store/user';
 import { useStoreProfile } from '@/store/profile';
@@ -344,7 +345,7 @@ import {
   CloseOutline,
 } from '@vicons/ionicons5';
 import { createPost } from '@/api/post';
-import { uploadTorrent, editTorrent, deleteTorrent, type TorrentItem } from '@/api/pt';
+import { uploadTorrent, editTorrent, deleteTorrent, getUserPTProfile, type TorrentItem } from '@/api/pt';
 import { parsePostTag } from '@/utils/content';
 import { isZipFile } from '@/utils/isZipFile';
 import type { MentionOption, UploadFileInfo, UploadInst } from 'naive-ui';
@@ -385,6 +386,9 @@ const currentTorrentSpState = ref<number>(1);
 const uploadingTorrent = ref(false);
 const torrentFileInputRef = ref<HTMLInputElement | null>(null);
 
+const userCanUploadTorrent = ref<boolean>(false);
+const isModOrAdmin = ref<boolean>(false);
+
 const spStateOptions = [
   { label: '普通', value: 1 },
   { label: '免费 (Free)', value: 2 },
@@ -394,6 +398,33 @@ const spStateOptions = [
   { label: '2X 50%', value: 6 },
   { label: '30% 下载', value: 7 },
 ];
+
+const filteredSpStateOptions = computed(() => {
+  if (isModOrAdmin.value) {
+    return spStateOptions;
+  }
+  return [{ label: '普通', value: 1 }];
+});
+
+const checkTorrentPermission = async () => {
+  if (!userInfo.value?.id) {
+    userCanUploadTorrent.value = false;
+    return;
+  }
+  try {
+    const prof = await getUserPTProfile();
+    if (prof) {
+      // Class 0 (Peasant) 或 can_upload === false 屏蔽上传种子按钮
+      userCanUploadTorrent.value = prof.class !== 0 && prof.can_upload !== false;
+      // 根据管理员配置与身份判定是否具备自由设定促销状态权限
+      isModOrAdmin.value = !!userInfo.value?.is_admin || !!prof.can_custom_promotion || prof.class >= 12;
+    } else {
+      userCanUploadTorrent.value = true;
+    }
+  } catch (e) {
+    userCanUploadTorrent.value = true;
+  }
+};
 
 const triggerTorrentUpload = () => {
   torrentFileInputRef.value?.click();
@@ -439,10 +470,13 @@ const handleSpStateChange = async (val: number) => {
       await editTorrent({
         id: currentTorrent.value.id,
         name: currentTorrent.value.name,
+        category_id: currentTorrent.value.category_id || 1,
         sp_state: val,
       });
       currentTorrent.value.sp_state = val;
-    } catch (e) {}
+    } catch (e: any) {
+      window.$message.error(e.message || '调整促销策略失败');
+    }
   }
 };
 
@@ -768,6 +802,7 @@ const triggerAuth = (key: string) => {
   storeMain.triggerAuthKey(key);
 };
 onMounted(() => {
+  checkTorrentPermission();
   const defaultVisibility = profile.value.defaultTweetVisibility;
   if (profile.value.useFriendship && defaultVisibility === 'friend') {
     defaultVisitType.value = VisibilityEnum.FRIEND;
@@ -780,6 +815,13 @@ onMounted(() => {
   }
   visitType.value = defaultVisitType.value;
 });
+
+watch(
+  () => userInfo.value?.id,
+  () => {
+    checkTorrentPermission();
+  }
+);
 </script>
 
 <style lang="less">

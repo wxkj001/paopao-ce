@@ -34,4 +34,7 @@ var (
 	_ core.OssCreateService     = (*minioCreateRetentionServant)(nil)
 	_ core.OssCreateService     = (*minioCreateTempDirServant)(nil)
 	_ core.VersionInfo          = (*minioServant)(nil)
+
+	_ core.ObjectStorageService = (*telegramServant)(nil)
+	_ core.VersionInfo          = (*telegramServant)(nil)
 )

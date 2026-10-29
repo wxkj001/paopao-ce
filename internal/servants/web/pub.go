@@ -11,12 +11,16 @@ import (
 	"image/color"
 	"image/png"
 	"regexp"
+	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/afocus/captcha"
 	"github.com/gofrs/uuid/v5"
 	api "github.com/rocboss/paopao-ce/auto/api/v1"
+	"github.com/rocboss/paopao-ce/internal/conf"
 	"github.com/rocboss/paopao-ce/internal/core/ms"
+	"github.com/rocboss/paopao-ce/internal/model/pt"
 	"github.com/rocboss/paopao-ce/internal/model/web"
 	"github.com/rocboss/paopao-ce/internal/servants/base"
 	"github.com/rocboss/paopao-ce/internal/servants/web/assets"
@@ -99,6 +103,26 @@ func (s *pubSrv) Register(req *web.RegisterReq) (*web.RegisterResp, error) {
 		logrus.Errorf("scheckPassword err: %v", err)
 		return nil, web.ErrUserRegisterFailed
 	}
+
+	var invite pt.PTInvite
+	inviteCode := strings.TrimSpace(req.InviteCode)
+	if conf.WebProfileSetting != nil && conf.WebProfileSetting.RequireInviteRegister && inviteCode == "" {
+		return nil, web.ErrRequireInviteCode
+	}
+	db := conf.MustGormDB()
+	if inviteCode != "" {
+		now := time.Now().Unix()
+		if err := db.Where("code = ?", inviteCode).First(&invite).Error; err != nil {
+			return nil, web.ErrInvalidInviteCode
+		}
+		if invite.Status == pt.InviteStatusUsed {
+			return nil, web.ErrInviteCodeUsed
+		}
+		if invite.Status == pt.InviteStatusExpired || invite.ExpireAt < now {
+			return nil, web.ErrInviteCodeExpired
+		}
+	}
+
 	password, salt := encryptPasswordAndSalt(req.Password)
 	user := &ms.User{
 		Nickname: req.Username,
@@ -113,6 +137,16 @@ func (s *pubSrv) Register(req *web.RegisterReq) (*web.RegisterResp, error) {
 		logrus.Errorf("Ds.CreateUser err: %s", err)
 		return nil, web.ErrUserRegisterFailed
 	}
+
+	if inviteCode != "" && invite.ID > 0 {
+		now := time.Now().Unix()
+		db.Model(&pt.PTInvite{}).Where("id = ?", invite.ID).Updates(map[string]any{
+			"status":      pt.InviteStatusUsed,
+			"invited_uid": user.ID,
+			"used_at":     now,
+		})
+	}
+
 	return &web.RegisterResp{
 		UserId:   user.ID,
 		Username: user.Username,

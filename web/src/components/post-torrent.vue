@@ -50,6 +50,7 @@
 
     <div class="torrent-actions-row">
       <n-button
+        v-if="canDownload"
         type="success"
         secondary
         size="small"
@@ -67,6 +68,7 @@
         文件清单
       </n-button>
       <n-button
+        v-if="canDownload"
         type="primary"
         size="small"
         @click="handleDownload"
@@ -76,32 +78,48 @@
       </n-button>
     </div>
 
-    <!-- Inline WebTorrent Streaming Player Area -->
-    <div v-if="showPlayer" class="webtorrent-player-box">
+    <!-- Inline Streaming Player Area -->
+    <div v-if="showPlayer && canDownload" class="webtorrent-player-box">
       <div class="player-toolbar">
         <div class="stream-stats">
-          <n-tag size="tiny" type="success" round>WebTorrent P2P</n-tag>
-          <span class="stat">节点: <strong>{{ p2pPeers }}</strong></span>
-          <span class="stat">下载: <strong>{{ p2pDownSpeed }}</strong></span>
-          <span class="stat">上传: <strong>{{ p2pUpSpeed }}</strong></span>
-          <span class="stat">进度: <strong>{{ (p2pProgress * 100).toFixed(1) }}%</strong></span>
+          <n-tag size="tiny" type="success" round>流媒体</n-tag>
+          <span class="stat">状态: <strong>{{ playerStatusText }}</strong></span>
+          <span class="stat" style="color: #888">纯下载观看，无需做种上传</span>
         </div>
-        <n-button size="tiny" quaternary type="error" @click="stopPlayer">
-          关闭播放
-        </n-button>
+        <div style="display: flex; gap: 6px; align-items: center">
+          <n-button size="tiny" quaternary type="warning" @click="handleSelectLocalFile" title="本地已有文件时可直接秒播">
+            本地秒播
+          </n-button>
+          <n-button size="tiny" quaternary type="error" @click="stopPlayer">
+            关闭播放
+          </n-button>
+        </div>
       </div>
 
       <div class="player-media-wrap">
-        <n-spin :show="playerLoading" description="正在通过 WebRTC 寻找节点并缓冲媒体流...">
-          <div ref="mediaContainerRef" class="media-container"></div>
+        <n-spin :show="playerLoading" :description="playerLoadingDesc">
+          <div class="media-container">
+            <video
+              ref="videoRef"
+              controls
+              autoplay
+              playsinline
+              class="w-full max-h-96 rounded-lg bg-black"
+              :src="currentStreamUrl"
+              @waiting="onVideoWaiting"
+              @loadeddata="onVideoCanPlay"
+              @playing="onVideoPlaying"
+              @canplay="onVideoCanPlay"
+              @error="onVideoError"
+            />
+          </div>
         </n-spin>
       </div>
-      <n-progress
-        type="line"
-        :percentage="Math.round(p2pProgress * 100)"
-        :show-indicator="false"
-        status="success"
-        style="margin-top: 6px"
+      <input
+        ref="localFileInputRef"
+        type="file"
+        style="display: none"
+        @change="onLocalFileSelected"
       />
     </div>
 
@@ -142,7 +160,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import {
   NButton,
   NIcon,
@@ -159,21 +177,47 @@ import {
   ArrowDownCircleOutline,
   PricetagOutline,
   PlayCircleOutline,
+  InformationCircleOutline,
+  FolderOpenOutline,
 } from '@vicons/ionicons5';
 import {
   getTorrentDetail,
   getTorrentDownloadURL,
+  getTorrentStreamURL,
   getSpLabel,
   getSpType,
   TorrentItem,
   TorrentFile,
 } from '@/api/pt';
+import { useStoreUser } from '@/store/user';
 
 const props = defineProps<{
   torrent: TorrentItem;
 }>();
 
 const message = useMessage();
+const storeUser = useStoreUser();
+
+const canDownload = computed(() => {
+  if (!storeUser.userLogined) return false;
+  if (storeUser.userInfo?.is_admin) return true;
+  const prof = storeUser.userPTProfile;
+  if (!prof) return false;
+  if (!prof.can_leech) return false;
+  if (prof.can_download === false) return false;
+  // Class 0 (Peasant) 仅允许下载免费种
+  if (prof.class === 0) {
+    return props.torrent?.sp_state === 2 || props.torrent?.sp_state === 4;
+  }
+  return true;
+});
+
+onMounted(() => {
+  if (storeUser.userLogined && !storeUser.userPTProfile) {
+    storeUser.loadUserPTProfile();
+  }
+});
+
 const showFilesModal = ref(false);
 const detailLoading = ref(false);
 const files = ref<TorrentFile[]>([]);
@@ -187,90 +231,102 @@ const formatSize = (bytes: number) => {
 };
 
 const handleDownload = () => {
+  if (!canDownload.value) {
+    message.warning('您当前用户等级暂无下载种子权限');
+    return;
+  }
   const url = getTorrentDownloadURL(props.torrent.id);
   window.open(url, '_blank');
   message.success('已开始下载专属种子');
 };
 
-let wtClient: any = null;
 const showPlayer = ref(false);
 const playerLoading = ref(false);
-const mediaContainerRef = ref<HTMLElement | null>(null);
-const p2pPeers = ref(0);
-const p2pDownSpeed = ref('0 B/s');
-const p2pUpSpeed = ref('0 B/s');
-const p2pProgress = ref(0);
-let statsInterval: any = null;
+const playerLoadingDesc = ref('正在缓冲...');
+const playerStatusText = ref('就绪');
+const currentStreamUrl = ref('');
+const videoRef = ref<HTMLVideoElement | null>(null);
+const localFileInputRef = ref<HTMLInputElement | null>(null);
+
+const handleSelectLocalFile = () => {
+  localFileInputRef.value?.click();
+};
+
+const onLocalFileSelected = (e: Event) => {
+  const target = e.target as HTMLInputElement;
+  const file = target.files?.[0];
+  if (!file) return;
+
+  showPlayer.value = true;
+  playerLoading.value = false;
+  playerStatusText.value = '本地秒播';
+  currentStreamUrl.value = URL.createObjectURL(file);
+
+  nextTick(() => {
+    if (videoRef.value) {
+      videoRef.value.load();
+      videoRef.value.play().catch(() => {});
+    }
+  });
+};
+
+const onVideoWaiting = () => {
+  playerLoading.value = true;
+  playerStatusText.value = '缓冲中...';
+  playerLoadingDesc.value = '正在缓冲...';
+};
+
+const onVideoPlaying = () => {
+  playerLoading.value = false;
+  playerStatusText.value = '正在播放';
+};
+
+const onVideoCanPlay = () => {
+  playerLoading.value = false;
+  playerStatusText.value = '已就绪';
+};
+
+const onVideoError = (e: any) => {
+  console.warn('Video element stream loading state:', e);
+  playerStatusText.value = '缓冲中...';
+};
 
 const toggleWebPlayer = async () => {
   if (showPlayer.value) {
     stopPlayer();
     return;
   }
+  if (!canDownload.value) {
+    message.warning('您当前用户等级暂无播放权限');
+    return;
+  }
   showPlayer.value = true;
   playerLoading.value = true;
+  playerStatusText.value = '正在缓冲...';
+  playerLoadingDesc.value = '正在缓冲...';
 
-  try {
-    const { default: WebTorrent } = await import('webtorrent/dist/webtorrent.min.js');
-    if (!wtClient) {
-      wtClient = new WebTorrent();
-    }
+  currentStreamUrl.value = getTorrentStreamURL(props.torrent.id);
 
-    const downloadUrl = getTorrentDownloadURL(props.torrent.id);
-
-    wtClient.add(downloadUrl, (torrent: any) => {
-      playerLoading.value = false;
-
-      // Find first playable media file
-      const file = torrent.files.find((f: any) => {
-        return /\.(mp4|webm|mkv|mov|mp3|wav|ogg)$/i.test(f.name);
-      }) || torrent.files[0];
-
-      if (file && mediaContainerRef.value) {
-        mediaContainerRef.value.innerHTML = '';
-        file.renderTo(mediaContainerRef.value, {
-          autoplay: true,
-          controls: true,
-        }, (err: any) => {
-          if (err) {
-            console.error('renderTo error:', err);
-          }
-        });
-      }
-
-      statsInterval = setInterval(() => {
-        p2pPeers.value = torrent.numPeers || 0;
-        p2pDownSpeed.value = formatSize(torrent.downloadSpeed) + '/s';
-        p2pUpSpeed.value = formatSize(torrent.uploadSpeed) + '/s';
-        p2pProgress.value = torrent.progress || 0;
-      }, 1000);
+  await nextTick();
+  if (videoRef.value) {
+    videoRef.value.load();
+    videoRef.value.play().catch((err) => {
+      console.log('Video autoplay deferred:', err);
     });
-  } catch (err: any) {
-    playerLoading.value = false;
-    message.error('启动 WebTorrent 播放失败: ' + (err.message || err));
   }
 };
 
 const stopPlayer = () => {
   showPlayer.value = false;
   playerLoading.value = false;
-  if (statsInterval) {
-    clearInterval(statsInterval);
-    statsInterval = null;
+  playerStatusText.value = '空闲';
+  if (videoRef.value) {
+    videoRef.value.pause();
+    if (currentStreamUrl.value.startsWith('blob:')) {
+      URL.revokeObjectURL(currentStreamUrl.value);
+    }
   }
-  if (wtClient) {
-    try {
-      wtClient.destroy();
-    } catch (e) {}
-    wtClient = null;
-  }
-  if (mediaContainerRef.value) {
-    mediaContainerRef.value.innerHTML = '';
-  }
-  p2pPeers.value = 0;
-  p2pProgress.value = 0;
-  p2pDownSpeed.value = '0 B/s';
-  p2pUpSpeed.value = '0 B/s';
+  currentStreamUrl.value = '';
 };
 
 onUnmounted(() => {
@@ -434,6 +490,42 @@ const loadDetails = async () => {
         video, audio {
           width: 100%;
           max-height: 480px;
+        }
+      }
+    }
+
+    .peer-hint-banner {
+      margin-top: 10px;
+      padding: 10px 12px;
+      background: rgba(240, 160, 32, 0.08);
+      border: 1px dashed rgba(240, 160, 32, 0.35);
+      border-radius: 6px;
+      font-size: 12px;
+
+      .hint-header {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-weight: 600;
+        color: #d48806;
+      }
+
+      .hint-desc {
+        margin-top: 4px;
+        line-height: 1.5;
+        color: var(--n-text-color-2);
+      }
+
+      .hint-action {
+        margin-top: 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+
+        .hint-action-tip {
+          color: var(--n-text-color-3);
+          font-size: 11px;
         }
       }
     }

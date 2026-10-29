@@ -123,6 +123,14 @@ const routes = [
     component: () => import('@/views/AdminSettings.vue'),
   },
   {
+    path: '/admin/pt-users',
+    name: 'admin-pt-users',
+    meta: {
+      title: 'PT 用户管理',
+    },
+    component: () => import('@/views/pt/AdminUserManage.vue'),
+  },
+  {
     path: '/404',
     name: '404',
     meta: {

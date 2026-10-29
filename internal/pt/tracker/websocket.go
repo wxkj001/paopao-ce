@@ -191,6 +191,9 @@ func (h *WSHub) SwarmCounts(infoHashHex string) (complete int, incomplete int) {
 func (t *Tracker) HandleWebSocket(c *gin.Context) {
 	passkey := c.Query("passkey")
 	if passkey == "" {
+		passkey = c.Query("pasakey")
+	}
+	if passkey == "" {
 		c.String(http.StatusBadRequest, "Missing passkey in tracker websocket url")
 		return
 	}
@@ -276,7 +279,7 @@ func (t *Tracker) serveWebSocketClient(conn *websocket.Conn, passkey string, use
 		case "scrape":
 			t.handleWSScrape(session, &msg)
 		default:
-			sendWSError(session, fmt.Sprintf("Unknown action: %s", msg.Action))
+			sendWSError(session, fmt.Sprintf("Unknown action: %s", msg.Action), msg.InfoHash)
 		}
 	}
 }
@@ -284,13 +287,13 @@ func (t *Tracker) serveWebSocketClient(conn *websocket.Conn, passkey string, use
 func (t *Tracker) handleWSAnnounce(session *WSPeerSession, msg *WSClientMessage, clientIP, userAgent string) {
 	infoHashBytes, infoHashHex, err := parseInfoHash(msg.InfoHash)
 	if err != nil {
-		sendWSError(session, "Invalid info_hash: "+err.Error())
+		sendWSError(session, "Invalid info_hash: "+err.Error(), msg.InfoHash)
 		return
 	}
 
 	peerIDBytes, peerIDHex, err := parsePeerID(msg.PeerID)
 	if err != nil {
-		sendWSError(session, "Invalid peer_id: "+err.Error())
+		sendWSError(session, "Invalid peer_id: "+err.Error(), msg.InfoHash)
 		return
 	}
 
@@ -365,7 +368,7 @@ func (t *Tracker) handleWSAnnounce(session *WSPeerSession, msg *WSClientMessage,
 	var dbResp *corept.AnnounceResp
 	dbResp, err = t.ptSrv.HandleAnnounce(req)
 	if err != nil {
-		sendWSError(session, err.Error())
+		sendWSError(session, err.Error(), msg.InfoHash)
 		return
 	}
 
@@ -417,9 +420,16 @@ func (t *Tracker) handleWSScrape(session *WSPeerSession, msg *WSClientMessage) {
 	}
 }
 
-func sendWSError(session *WSPeerSession, reason string) {
+func sendWSError(session *WSPeerSession, reason string, infoHash ...string) {
+	var hash string
+	if len(infoHash) > 0 && infoHash[0] != "" {
+		hash = infoHash[0]
+	} else if session != nil {
+		hash = session.InfoHash
+	}
 	msg := WSServerMessage{
 		Action:        "announce",
+		InfoHash:      hash,
 		FailureReason: reason,
 	}
 	if data, err := json.Marshal(msg); err == nil {
@@ -427,19 +437,33 @@ func sendWSError(session *WSPeerSession, reason string) {
 	}
 }
 
-// parseInfoHash parses a 20-byte binary string or a 40-character hex string into 20 bytes and hex string.
+// parseInfoHash parses a 20-character binary string (codepoints 0-255), 20-byte slice or 40-character hex string.
 func parseInfoHash(s string) ([]byte, string, error) {
-	b := []byte(s)
-	if len(b) == 20 {
-		return b, hex.EncodeToString(b), nil
-	}
 	if len(s) == 40 {
 		decoded, err := hex.DecodeString(s)
 		if err == nil && len(decoded) == 20 {
 			return decoded, strings.ToLower(s), nil
 		}
 	}
-	// Fallback: if it's less than 20 bytes, pad or hash
+	runes := []rune(s)
+	if len(runes) == 20 {
+		b := make([]byte, 20)
+		isBinary := true
+		for i, r := range runes {
+			if r > 255 {
+				isBinary = false
+				break
+			}
+			b[i] = byte(r)
+		}
+		if isBinary {
+			return b, hex.EncodeToString(b), nil
+		}
+	}
+	b := []byte(s)
+	if len(b) == 20 {
+		return b, hex.EncodeToString(b), nil
+	}
 	if len(b) > 0 {
 		h := sha1.Sum(b)
 		return h[:], hex.EncodeToString(h[:]), nil
@@ -447,17 +471,32 @@ func parseInfoHash(s string) ([]byte, string, error) {
 	return nil, "", errors.New("empty info_hash")
 }
 
-// parsePeerID parses a 20-byte binary string or a 40-character hex string into 20 bytes and hex string.
+// parsePeerID parses a 20-character binary string (codepoints 0-255), 20-byte slice or 40-character hex string.
 func parsePeerID(s string) ([]byte, string, error) {
-	b := []byte(s)
-	if len(b) == 20 {
-		return b, hex.EncodeToString(b), nil
-	}
 	if len(s) == 40 {
 		decoded, err := hex.DecodeString(s)
 		if err == nil && len(decoded) == 20 {
 			return decoded, strings.ToLower(s), nil
 		}
+	}
+	runes := []rune(s)
+	if len(runes) == 20 {
+		b := make([]byte, 20)
+		isBinary := true
+		for i, r := range runes {
+			if r > 255 {
+				isBinary = false
+				break
+			}
+			b[i] = byte(r)
+		}
+		if isBinary {
+			return b, hex.EncodeToString(b), nil
+		}
+	}
+	b := []byte(s)
+	if len(b) == 20 {
+		return b, hex.EncodeToString(b), nil
 	}
 	if len(b) > 0 {
 		h := sha1.Sum(b)

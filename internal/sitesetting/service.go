@@ -26,6 +26,7 @@ type EditableProfile struct {
 	AllowTweetAttachment      bool
 	AllowTweetAttachmentPrice bool
 	AllowTweetVideo           bool
+	RequireInviteRegister     bool
 	DefaultTweetMaxLength     int
 	TweetWebEllipsisSize      int
 	TweetMobileEllipsisSize   int
@@ -121,6 +122,7 @@ func (s *Service) GetProfile(ctx context.Context) (*web.SiteProfileResp, error) 
 		AllowTweetVideo:           conf.WebProfileSetting.AllowTweetVideo,
 		AllowUserRegister:         conf.WebProfileSetting.AllowUserRegister,
 		AllowPhoneBind:            conf.WebProfileSetting.AllowPhoneBind,
+		RequireInviteRegister:     conf.WebProfileSetting.RequireInviteRegister,
 		DefaultTweetMaxLength:     conf.WebProfileSetting.DefaultTweetMaxLength,
 		TweetWebEllipsisSize:      conf.WebProfileSetting.TweetWebEllipsisSize,
 		TweetMobileEllipsisSize:   conf.WebProfileSetting.TweetMobileEllipsisSize,

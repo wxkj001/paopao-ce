@@ -84,6 +84,37 @@ type ScrapeResp struct {
 	Files []ScrapeFile
 }
 
+// AdminPTUserItem represents user summary for the PT admin panel.
+type AdminPTUserItem struct {
+	UserID      int64   `json:"user_id"`
+	Username    string  `json:"username"`
+	Nickname    string  `json:"nickname"`
+	Avatar      string  `json:"avatar"`
+	IsAdmin     bool    `json:"is_admin"`
+	Class       int     `json:"class"`
+	ClassName   string  `json:"class_name"`
+	ClassColor  string  `json:"class_color"`
+	CustomTitle string  `json:"custom_title"`
+	VipUntil    int64   `json:"vip_until"`
+	Uploaded    uint64  `json:"uploaded"`
+	Downloaded  uint64  `json:"downloaded"`
+	Ratio       float64 `json:"ratio"`
+	SeedBonus   float64 `json:"seed_bonus"`
+	CanLeech    bool    `json:"can_leech"`
+	CanUpload   bool    `json:"can_upload"`
+	CreatedOn   int64   `json:"created_on"`
+}
+
+// AdminUpdateUserReq represents parameters to modify a user's PT permissions and class.
+type AdminUpdateUserReq struct {
+	UserID      int64  `json:"user_id"`
+	Class       int    `json:"class"`
+	CustomTitle string `json:"custom_title"`
+	VipDays     int    `json:"vip_days"`
+	CanUpload   *bool  `json:"can_upload"`
+	CanLeech    *bool  `json:"can_leech"`
+}
+
 // PTService provides full Private Tracker capabilities.
 type PTService interface {
 	// Torrents Management
@@ -110,6 +141,20 @@ type PTService interface {
 	GetBonusOptions() []pt.PTBonusOption
 	ExchangeBonus(userID int64, optionID int) error
 	CalculateHourlyKarma() error
+
+	// Authority & Promotion Engine
+	RunPromotionAndDemotion() error
+	UpdateUserClass(userID int64, targetClass int, customTitle string) error
+	AdminListUsers(keyword string, classFilter int, page, pageSize int) ([]*AdminPTUserItem, int64, error)
+	AdminUpdateUser(req *AdminUpdateUserReq) error
+	GetAuthorityRules() *pt.PTAuthorityRules
+	SaveAuthorityRules(rules *pt.PTAuthorityRules) error
+
+	// Invites
+	GetMyInvites(userID int64) ([]*pt.PTInvite, int, error)
+	GenerateInvite(userID int64) (*pt.PTInvite, error)
+	CheckInvite(code string) (*pt.PTInvite, error)
+	ConsumeInvite(code string, invitedUID int64) error
 
 	// Categories
 	ListCategories() ([]pt.PTCategory, error)

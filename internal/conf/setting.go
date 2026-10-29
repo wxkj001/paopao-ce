@@ -279,6 +279,32 @@ type localossConf struct {
 	Domain   string
 }
 
+type TelegramChannelConf struct {
+	Id     string `json:"id"`
+	Name   string `json:"name"`
+	Weight int    `json:"weight"`
+}
+
+type TelegramCacheConf struct {
+	Enabled    bool   `json:"enabled"`
+	SavePath   string `json:"save_path"`
+	MaxSizeMB  int64  `json:"max_size_mb"`
+	MaxAgeDays int    `json:"max_age_days"`
+}
+
+type TelegramOSSConf struct {
+	Endpoint        string                `json:"endpoint"`
+	Token           string                `json:"token"`
+	Proxy           string                `json:"proxy"`
+	Domain          string                `json:"domain"`
+	Secure          bool                  `json:"secure"`
+	LocalMode       bool                  `json:"local_mode"`
+	Channels        []TelegramChannelConf `json:"channels"`
+	ChannelStrategy string                `json:"channel_strategy"`
+	SecretKey       string                `json:"secret_key"`
+	Cache           TelegramCacheConf     `json:"cache"`
+}
+
 type redisConf struct {
 	InitAddress      []string
 	Username         string
@@ -306,6 +332,7 @@ type WebProfileConf struct {
 	AllowTweetVideo           bool   `json:"allow_tweet_video"`
 	AllowUserRegister         bool   `json:"allow_user_register"`
 	AllowPhoneBind            bool   `json:"allow_phone_bind"`
+	RequireInviteRegister     bool   `json:"require_invite_register"`
 	DefaultTweetMaxLength     int    `json:"default_tweet_max_length"`
 	TweetWebEllipsisSize      int    `json:"tweet_web_ellipsis_size"`
 	TweetMobileEllipsisSize   int    `json:"tweet_mobile_ellipsis_size"`
@@ -318,13 +345,19 @@ type WebProfileConf struct {
 	CopyrightRightLink        string `json:"copyright_right_link"`
 }
 
+type ptAuthorityConf struct {
+	PromotionInterval int            `json:"promotion_interval"`
+	ClassNames        map[int]string `json:"class_names"`
+}
+
 type ptConf struct {
-	AnnounceURL      string `json:"announce_url"`
-	WsAnnounceURL    string `json:"ws_announce_url"`
-	AnnounceInterval int    `json:"announce_interval"`
-	MinInterval      int    `json:"min_interval"`
-	SiteSource       string `json:"site_source"`
-	StoragePath      string `json:"storage_path"`
+	AnnounceURL      string          `json:"announce_url"`
+	WsAnnounceURL    string          `json:"ws_announce_url"`
+	AnnounceInterval int             `json:"announce_interval"`
+	MinInterval      int             `json:"min_interval"`
+	SiteSource       string          `json:"site_source"`
+	StoragePath      string          `json:"storage_path"`
+	Authority        ptAuthorityConf `json:"authority"`
 }
 
 func (s *httpServerConf) GetReadTimeout() time.Duration {

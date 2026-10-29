@@ -20,6 +20,35 @@
                         <n-tag v-if="userInfo.is_admin" class="top-tag" type="error" size="small" round>
                             管理员
                         </n-tag>
+                        <n-tag
+                            v-if="ptProfile?.class_name"
+                            class="top-tag pt-class-badge"
+                            size="small"
+                            round
+                            strong
+                            :color="{ color: ptProfile.class_color, textColor: '#fff' }"
+                        >
+                            {{ ptProfile.class === 10 ? '👑 ' : '' }}{{ ptProfile.class_name }}
+                        </n-tag>
+                        <n-tag
+                            v-if="ptProfile?.custom_title"
+                            class="top-tag pt-custom-title"
+                            type="info"
+                            size="small"
+                            round
+                            secondary
+                        >
+                            {{ ptProfile.custom_title }}
+                        </n-tag>
+                        <n-tag
+                            v-if="ptProfile?.class === 10 && ptProfile.vip_until > 0"
+                            class="top-tag pt-vip-remain"
+                            type="warning"
+                            size="small"
+                            round
+                        >
+                            VIP剩余: {{ Math.max(0, Math.ceil((ptProfile.vip_until - (Date.now()/1000))/86400)) }}天
+                        </n-tag>
                     </div>
                     <div class="userinfo">
                         <span class="info-item">UID. {{ userInfo.id }} </span>
@@ -92,17 +121,27 @@
                                 <span class="pt-label">当前下载</span>
                                 <span class="pt-val">{{ ptProfile.leech_count }}</span>
                             </div>
+                            <div class="pt-stat-item clickable" @click="openInviteModal" title="点击查看与管理邀请码">
+                                <span class="pt-label">邀请名额</span>
+                                <span class="pt-val bonus">{{ ptProfile.invites || 0 }}</span>
+                            </div>
                         </div>
                         <div class="pt-passkey-row">
-                            <span class="passkey-title">Passkey:</span>
-                            <span class="passkey-code">{{ maskedPasskey }}</span>
-                            <n-button size="tiny" quaternary type="primary" @click="copyPasskey">复制</n-button>
-                            <n-popconfirm @positive-click="handleResetPasskey">
-                                <template #trigger>
-                                    <n-button size="tiny" quaternary type="warning">重置</n-button>
-                                </template>
-                                重置后旧 Passkey 将失效，需更新 BT 客户端中任务的 Tracker 地址，确定重置？
-                            </n-popconfirm>
+                            <div class="passkey-left-group">
+                                <span class="passkey-title">Passkey:</span>
+                                <span class="passkey-code">{{ maskedPasskey }}</span>
+                                <n-button size="tiny" quaternary type="primary" @click="copyPasskey">复制</n-button>
+                                <n-popconfirm @positive-click="handleResetPasskey">
+                                    <template #trigger>
+                                        <n-button size="tiny" quaternary type="warning">重置</n-button>
+                                    </template>
+                                    重置后旧 Passkey 将失效，需更新 BT 客户端中任务的 Tracker 地址，确定重置？
+                                </n-popconfirm>
+                            </div>
+                            <n-button size="tiny" secondary type="primary" @click="openInviteModal" class="invite-manage-btn">
+                                <template #icon><n-icon :component="TicketOutline" /></template>
+                                邀请码管理 ({{ ptProfile.invites || 0 }})
+                            </n-button>
                         </div>
                         <div class="pt-tracker-row" v-if="ptProfile.http_tracker_url || ptProfile.ws_tracker_url">
                             <div class="tracker-item" v-if="ptProfile.http_tracker_url">
@@ -116,6 +155,84 @@
                                 <span class="tracker-title">WebSocket Tracker (WebTorrent):</span>
                                 <span class="tracker-url" :title="ptProfile.ws_tracker_url">{{ ptProfile.ws_tracker_url }}</span>
                                 <n-button size="tiny" quaternary type="primary" @click="copyText(ptProfile.ws_tracker_url, 'WebSocket Tracker 地址已复制')">复制</n-button>
+                            </div>
+                        </div>
+
+                        <!-- 当前身份拥有的专属特权 -->
+                        <div class="pt-privileges-row" v-if="ptProfile.privileges && ptProfile.privileges.length">
+                            <span class="privileges-title">等级特权:</span>
+                            <div class="privileges-tags">
+                                <n-tag
+                                    v-for="(priv, idx) in ptProfile.privileges"
+                                    :key="idx"
+                                    size="tiny"
+                                    round
+                                    secondary
+                                    type="info"
+                                >
+                                    {{ priv }}
+                                </n-tag>
+                                <n-tag
+                                    v-if="ptProfile.karma_multiplier && ptProfile.karma_multiplier > 1.0"
+                                    size="tiny"
+                                    round
+                                    secondary
+                                    type="warning"
+                                >
+                                    💎 {{ ptProfile.karma_multiplier }}x 做种魔力加成
+                                </n-tag>
+                            </div>
+                        </div>
+
+                        <!-- 下一等级考核进度 -->
+                        <div class="pt-upgrade-box" v-if="ptProfile.next_class">
+                            <div class="upgrade-header">
+                                <span class="target-title">
+                                    下一级目标: <strong>{{ ptProfile.next_class.next_class_name }}</strong>
+                                </span>
+                                <span class="tip">达成以下所有指标自动晋升</span>
+                            </div>
+                            <div class="criteria-grid">
+                                <div class="criterion-item">
+                                    <div class="crit-title">注册周数</div>
+                                    <div class="crit-val">{{ ptProfile.next_class.cur_weeks }} / {{ ptProfile.next_class.req_weeks }} 周</div>
+                                    <n-progress
+                                        type="line"
+                                        :percentage="Math.min(100, Math.round((ptProfile.next_class.cur_weeks / (ptProfile.next_class.req_weeks || 1)) * 100))"
+                                        :show-indicator="false"
+                                        :status="ptProfile.next_class.cur_weeks >= ptProfile.next_class.req_weeks ? 'success' : 'default'"
+                                    />
+                                </div>
+                                <div class="criterion-item">
+                                    <div class="crit-title">下载量</div>
+                                    <div class="crit-val">{{ ptProfile.next_class.cur_download_gb.toFixed(1) }} / {{ ptProfile.next_class.req_download_gb }} GB</div>
+                                    <n-progress
+                                        type="line"
+                                        :percentage="Math.min(100, Math.round((ptProfile.next_class.cur_download_gb / (ptProfile.next_class.req_download_gb || 1)) * 100))"
+                                        :show-indicator="false"
+                                        :status="ptProfile.next_class.cur_download_gb >= ptProfile.next_class.req_download_gb ? 'success' : 'default'"
+                                    />
+                                </div>
+                                <div class="criterion-item">
+                                    <div class="crit-title">分享率</div>
+                                    <div class="crit-val">{{ ptProfile.next_class.cur_ratio.toFixed(2) }} / {{ ptProfile.next_class.req_ratio.toFixed(2) }}</div>
+                                    <n-progress
+                                        type="line"
+                                        :percentage="Math.min(100, Math.round((ptProfile.next_class.cur_ratio / (ptProfile.next_class.req_ratio || 1)) * 100))"
+                                        :show-indicator="false"
+                                        :status="ptProfile.next_class.cur_ratio >= ptProfile.next_class.req_ratio ? 'success' : 'default'"
+                                    />
+                                </div>
+                                <div class="criterion-item">
+                                    <div class="crit-title">上传量 (推算)</div>
+                                    <div class="crit-val">{{ ptProfile.next_class.cur_upload_gb.toFixed(1) }} / {{ ptProfile.next_class.req_upload_gb }} GB</div>
+                                    <n-progress
+                                        type="line"
+                                        :percentage="Math.min(100, Math.round((ptProfile.next_class.cur_upload_gb / (ptProfile.next_class.req_upload_gb || 1)) * 100))"
+                                        :show-indicator="false"
+                                        :status="ptProfile.next_class.cur_upload_gb >= ptProfile.next_class.req_upload_gb ? 'success' : 'default'"
+                                    />
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -172,6 +289,102 @@
                 </template>
             </InfiniteLoading>
         </n-space>
+
+        <!-- 邀请码管理弹窗 -->
+        <n-modal
+            v-model:show="showInviteModal"
+            preset="card"
+            title="🎟️ 注册邀请码管理"
+            style="width: 660px; max-width: 95vw;"
+            :bordered="false"
+        >
+            <div class="invite-modal-container">
+                <div class="invite-quota-card">
+                    <div class="quota-meta">
+                        <span class="quota-label">当前可用邀请名额</span>
+                        <div class="quota-count-wrap">
+                            <span class="quota-number">{{ inviteQuota }}</span>
+                            <span class="quota-unit">枚</span>
+                        </div>
+                    </div>
+                    <div class="quota-btn-group">
+                        <n-button
+                            type="primary"
+                            size="small"
+                            :loading="generatingInvite"
+                            :disabled="inviteQuota <= 0"
+                            @click="handleGenerateInvite"
+                        >
+                            <template #icon><n-icon :component="AddOutline" /></template>
+                            生成新邀请码
+                        </n-button>
+                        <n-button
+                            v-if="inviteQuota <= 0"
+                            size="small"
+                            quaternary
+                            type="warning"
+                            @click="router.push('/pt/bonus-shop')"
+                        >
+                            去魔力商城兑换
+                        </n-button>
+                    </div>
+                </div>
+
+                <div v-if="inviteQuota <= 0" class="invite-notice-bar">
+                    💡 邀请名额不足？您可通过提升 PT 用户等级（考核晋升）自动获赠，或前往「魔力商城」消耗魔力值兑换邀请名额。
+                </div>
+
+                <div class="invite-table-header">
+                    <span class="tbl-title">我的邀请码记录 ({{ inviteList.length }})</span>
+                    <n-button size="tiny" quaternary type="default" @click="loadInvites" :loading="loadingInvites">
+                        刷新
+                    </n-button>
+                </div>
+
+                <div v-if="loadingInvites" style="padding: 30px; text-align: center">
+                    <n-spin size="medium" />
+                </div>
+
+                <n-empty
+                    v-else-if="inviteList.length === 0"
+                    description="暂无生成的邀请码，点击上方“生成新邀请码”即可生成"
+                    style="margin: 30px 0"
+                />
+
+                <div v-else class="invite-card-list">
+                    <div
+                        v-for="item in inviteList"
+                        :key="item.id"
+                        class="invite-card-item"
+                        :class="'status-' + item.status"
+                    >
+                        <div class="card-left">
+                            <div class="card-code-line">
+                                <span class="code-val">{{ item.code }}</span>
+                                <n-tag size="tiny" :type="item.status === 0 ? 'success' : item.status === 1 ? 'info' : 'warning'" round>
+                                    {{ item.status === 0 ? '未使用' : item.status === 1 ? '已使用' : '已过期' }}
+                                </n-tag>
+                            </div>
+                            <div class="card-meta-line">
+                                <span>创建: {{ formatDate(item.created_at) }}</span>
+                                <span v-if="item.status === 0">有效期至: {{ formatDate(item.expire_at) }}</span>
+                                <span v-if="item.status === 1 && item.invited_name" class="used-info">
+                                    使用者: <strong>{{ item.invited_name }}</strong> ({{ formatDate(item.used_at) }})
+                                </span>
+                            </div>
+                        </div>
+                        <div class="card-right" v-if="item.status === 0">
+                            <n-button size="tiny" secondary type="primary" @click="copyText(item.code, '邀请码已复制')">
+                                复制邀请码
+                            </n-button>
+                            <n-button size="tiny" quaternary type="primary" @click="copyInviteLink(item.code)">
+                                复制注册链接
+                            </n-button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </n-modal>
     </div>
 </template>
 
@@ -184,12 +397,12 @@ import { useDialog, DropdownOption } from 'naive-ui';
 import { formatDate } from '@/utils/formatTime';
 import { prettyQuoteNum } from '@/utils/count';
 import InfiniteLoading from 'v3-infinite-loading';
-import { SettingsOutline } from '@vicons/ionicons5';
+import { SettingsOutline, TicketOutline, AddOutline } from '@vicons/ionicons5';
 import { MoreHorizFilled } from '@vicons/material';
 import { useStoreUser } from '@/store/user';
 import { storeToRefs } from 'pinia';
 import { Api } from '@/utils/request';
-import { getUserPTProfile, resetUserPasskey, type UserPTProfile } from '@/api/pt';
+import { getUserPTProfile, resetUserPasskey, getMyInvites, generateInvite, type UserPTProfile, type PTInviteItem } from '@/api/pt';
 import copy from 'copy-to-clipboard';
 
 type PageType = 'post' | 'comment' | 'highlight' | 'media' | 'star';
@@ -363,6 +576,54 @@ const handleResetPasskey = async () => {
   }
 };
 
+const showInviteModal = ref(false);
+const inviteQuota = ref(0);
+const inviteList = ref<PTInviteItem[]>([]);
+const loadingInvites = ref(false);
+const generatingInvite = ref(false);
+
+const openInviteModal = () => {
+  showInviteModal.value = true;
+  inviteQuota.value = ptProfile.value?.invites || 0;
+  loadInvites();
+};
+
+const loadInvites = async () => {
+  loadingInvites.value = true;
+  try {
+    const res = await getMyInvites();
+    inviteQuota.value = res.invites || 0;
+    inviteList.value = res.list || [];
+    if (ptProfile.value) {
+      ptProfile.value.invites = res.invites || 0;
+    }
+  } catch (e: any) {
+    window.$message.error(e?.message || '获取邀请码列表失败');
+  } finally {
+    loadingInvites.value = false;
+  }
+};
+
+const handleGenerateInvite = async () => {
+  generatingInvite.value = true;
+  try {
+    await generateInvite();
+    window.$message.success('邀请码生成成功！');
+    await loadInvites();
+  } catch (err: any) {
+    window.$message.error(err?.message || '生成邀请码失败');
+  } finally {
+    generatingInvite.value = false;
+  }
+};
+
+const copyInviteLink = (code: string) => {
+  const host = window.location.origin + window.location.pathname;
+  const link = `${host}#/?invite=${code}`;
+  copy(link);
+  window.$message.success('专属注册链接已复制');
+};
+
 const loadPTProfile = async () => {
   try {
     const res = await getUserPTProfile();
@@ -509,18 +770,28 @@ watch(
 
             .pt-stat-grid {
                 display: grid;
-                grid-template-columns: repeat(6, 1fr);
+                grid-template-columns: repeat(7, 1fr);
                 gap: 8px;
                 text-align: center;
 
                 @media (max-width: 640px) {
-                    grid-template-columns: repeat(3, 1fr);
+                    grid-template-columns: repeat(4, 1fr);
                     row-gap: 10px;
                 }
 
                 .pt-stat-item {
                     display: flex;
                     flex-direction: column;
+
+                    &.clickable {
+                        cursor: pointer;
+                        padding: 2px 4px;
+                        border-radius: 4px;
+                        transition: background-color 0.2s ease;
+                        &:hover {
+                            background: rgba(24, 160, 88, 0.1);
+                        }
+                    }
 
                     .pt-label {
                         font-size: 11px;
@@ -557,8 +828,16 @@ watch(
                 border-top: 1px dashed rgba(128, 128, 128, 0.15);
                 display: flex;
                 align-items: center;
+                justify-content: space-between;
                 gap: 8px;
+                flex-wrap: wrap;
                 font-size: 12px;
+
+                .passkey-left-group {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                }
 
                 .passkey-title {
                     opacity: 0.65;
@@ -571,6 +850,10 @@ watch(
                     padding: 2px 6px;
                     border-radius: 4px;
                     letter-spacing: 0.5px;
+                }
+
+                .invite-manage-btn {
+                    margin-left: auto;
                 }
             }
 
@@ -622,6 +905,74 @@ watch(
                     }
                 }
             }
+
+            .pt-privileges-row {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                margin-top: 8px;
+                font-size: 12px;
+                flex-wrap: wrap;
+
+                .privileges-title {
+                    font-weight: 600;
+                    opacity: 0.75;
+                    white-space: nowrap;
+                }
+
+                .privileges-tags {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    flex-wrap: wrap;
+                }
+            }
+
+            .pt-upgrade-box {
+                margin-top: 10px;
+                padding: 10px 12px;
+                background: rgba(0, 0, 0, 0.02);
+                border: 1px dashed rgba(24, 160, 88, 0.25);
+                border-radius: 6px;
+
+                .upgrade-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 8px;
+                    font-size: 12px;
+
+                    .target-title strong {
+                        color: #18a058;
+                    }
+                    .tip {
+                        font-size: 11px;
+                        opacity: 0.6;
+                    }
+                }
+
+                .criteria-grid {
+                    display: grid;
+                    grid-template-columns: repeat(4, 1fr);
+                    gap: 10px;
+
+                    .criterion-item {
+                        display: flex;
+                        flex-direction: column;
+                        gap: 2px;
+
+                        .crit-title {
+                            font-size: 11px;
+                            opacity: 0.65;
+                        }
+                        .crit-val {
+                            font-size: 11px;
+                            font-weight: 600;
+                            margin-bottom: 2px;
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -655,6 +1006,142 @@ watch(
 .dark {
     .profile-wrap, .pagination-wrap {
         background-color: rgba(16, 16, 20, 0.75);
+    }
+}
+
+.invite-modal-container {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+
+    .invite-quota-card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 18px;
+        background: linear-gradient(135deg, rgba(24, 160, 88, 0.08) 0%, rgba(32, 128, 240, 0.08) 100%);
+        border: 1px solid rgba(24, 160, 88, 0.2);
+        border-radius: 8px;
+
+        .quota-meta {
+            .quota-label {
+                font-size: 12px;
+                opacity: 0.7;
+            }
+            .quota-count-wrap {
+                margin-top: 4px;
+                display: flex;
+                align-items: baseline;
+                gap: 4px;
+
+                .quota-number {
+                    font-size: 26px;
+                    font-weight: 700;
+                    color: #18a058;
+                    line-height: 1;
+                }
+                .quota-unit {
+                    font-size: 12px;
+                    opacity: 0.6;
+                }
+            }
+        }
+
+        .quota-btn-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+    }
+
+    .invite-notice-bar {
+        font-size: 12px;
+        line-height: 1.5;
+        padding: 8px 12px;
+        border-radius: 6px;
+        background: rgba(240, 160, 32, 0.1);
+        border: 1px dashed rgba(240, 160, 32, 0.3);
+        color: #d48806;
+    }
+
+    .invite-table-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 13px;
+        font-weight: 600;
+        margin-top: 4px;
+    }
+
+    .invite-card-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        max-height: 380px;
+        overflow-y: auto;
+        padding-right: 4px;
+
+        .invite-card-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 14px;
+            border-radius: 6px;
+            background: rgba(128, 128, 128, 0.06);
+            border: 1px solid rgba(128, 128, 128, 0.15);
+            transition: all 0.2s ease;
+
+            &.status-0 {
+                border-left: 3px solid #18a058;
+            }
+            &.status-1 {
+                border-left: 3px solid #2080f0;
+                opacity: 0.8;
+            }
+            &.status-2 {
+                border-left: 3px solid #f0a020;
+                opacity: 0.65;
+            }
+
+            .card-left {
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+
+                .card-code-line {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+
+                    .code-val {
+                        font-family: monospace;
+                        font-weight: 600;
+                        font-size: 13px;
+                        letter-spacing: 0.5px;
+                    }
+                }
+
+                .card-meta-line {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    font-size: 11px;
+                    opacity: 0.65;
+                    flex-wrap: wrap;
+
+                    .used-info {
+                        color: #2080f0;
+                        opacity: 1;
+                    }
+                }
+            }
+
+            .card-right {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+        }
     }
 }
 </style>

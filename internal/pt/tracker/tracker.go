@@ -34,6 +34,10 @@ func (t *Tracker) HandleAnnounce(c *gin.Context) {
 
 	passkey := string(params.getFirst("passkey"))
 	if passkey == "" {
+		// Tolerant fallback for common typo
+		passkey = string(params.getFirst("pasakey"))
+	}
+	if passkey == "" {
 		sendFailure(c, "Missing passkey in announce URL")
 		return
 	}

@@ -6,6 +6,7 @@ package jinzhu
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -284,6 +285,17 @@ func (s *tweetManageSrv) DeletePost(post *ms.Post) ([]string, error) {
 			if tags := strings.Split(post.Tags, ","); len(tags) > 0 {
 				// 删tag，宽松处理错误，有错误不会回滚
 				deleteTags(tx, tags)
+			}
+
+			// 删关联 PT 种子 (如果有)
+			var torrent pt.Torrent
+			if err := tx.Where("post_id = ?", postId).First(&torrent).Error; err == nil {
+				_ = tx.Unscoped().Where("torrent_id = ?", torrent.ID).Delete(&pt.TorrentFile{}).Error
+				_ = tx.Unscoped().Where("torrent_id = ?", torrent.ID).Delete(&pt.TorrentPeer{}).Error
+				_ = tx.Unscoped().Delete(&torrent).Error
+				if torrent.FilePath != "" {
+					_ = os.Remove(torrent.FilePath)
+				}
 			}
 
 			return nil

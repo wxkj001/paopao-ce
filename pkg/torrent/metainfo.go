@@ -200,10 +200,6 @@ func CustomizeForUser(torrentData []byte, userPasskey, announceBaseURL, wsAnnoun
 	announceList := []any{
 		[]any{httpAnnounce},
 	}
-	if wsAnnounceBaseURL != "" {
-		wsAnnounce := formatAnnounceURL(wsAnnounceBaseURL, userPasskey)
-		announceList = append(announceList, []any{wsAnnounce})
-	}
 	dict["announce-list"] = announceList
 
 	delete(dict, "nodes")

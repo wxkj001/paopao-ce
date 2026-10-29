@@ -23,13 +23,17 @@
             v-for="opt in options"
             :key="opt.id"
             class="option-card"
+            :class="{ 'vip-card': opt.id === 5 }"
           >
             <div class="card-icon">
-              <n-icon size="36" color="#8a2be2">
+              <n-icon size="36" :color="opt.id === 5 ? '#faad14' : '#8a2be2'">
                 <gift-outline />
               </n-icon>
             </div>
-            <div class="card-title">{{ opt.name }}</div>
+            <div class="card-title">
+              {{ opt.name }}
+              <n-tag v-if="opt.id === 5" size="tiny" type="warning" round style="margin-left: 4px">特权</n-tag>
+            </div>
             <div class="card-desc">{{ opt.description }}</div>
             <div class="card-price">
               <span class="pts">{{ opt.points }}</span>
@@ -191,6 +195,16 @@ onMounted(() => {
         border-color: #8a2be2;
         transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+      }
+
+      &.vip-card {
+        border-color: rgba(250, 173, 20, 0.4);
+        background: rgba(250, 173, 20, 0.03);
+
+        &:hover {
+          border-color: #faad14;
+          box-shadow: 0 4px 14px rgba(250, 173, 20, 0.15);
+        }
       }
 
       .card-icon {

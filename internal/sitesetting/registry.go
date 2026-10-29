@@ -43,6 +43,7 @@ type bootstrapSnapshot struct {
 	MinIO         confMinIOSnapshot
 	S3            confS3Snapshot
 	LocalOSS      confLocalOSSSnapshot
+	TelegramOSS   confTelegramOSSSnapshot
 	SmsJuhe       confSmsJuheSnapshot
 	Alipay        confAlipaySnapshot
 	WebProfile    confWebProfileSnapshot
@@ -131,6 +132,16 @@ type confLocalOSSSnapshot struct {
 	Domain   string
 }
 
+type confTelegramOSSSnapshot struct {
+	Endpoint        string
+	Token           string
+	Proxy           string
+	Domain          string
+	Secure          bool
+	LocalMode       bool
+	ChannelStrategy string
+}
+
 type confSmsJuheSnapshot struct {
 	Gateway string
 	Key     string
@@ -156,6 +167,7 @@ type confWebProfileSnapshot struct {
 	AllowTweetVideo           bool
 	AllowUserRegister         bool
 	AllowPhoneBind            bool
+	RequireInviteRegister     bool
 	DefaultTweetMaxLength     int
 	TweetWebEllipsisSize      int
 	TweetMobileEllipsisSize   int
@@ -242,6 +254,9 @@ func ensureBootstrapSnapshot() {
 	if conf.LocalOSSSetting != nil {
 		bootstrapConfig.LocalOSS = confLocalOSSSnapshot{SavePath: conf.LocalOSSSetting.SavePath, Secure: conf.LocalOSSSetting.Secure, Bucket: conf.LocalOSSSetting.Bucket, Domain: conf.LocalOSSSetting.Domain}
 	}
+	if conf.TelegramOSSSetting != nil {
+		bootstrapConfig.TelegramOSS = confTelegramOSSSnapshot{Endpoint: conf.TelegramOSSSetting.Endpoint, Token: conf.TelegramOSSSetting.Token, Proxy: conf.TelegramOSSSetting.Proxy, Domain: conf.TelegramOSSSetting.Domain, Secure: conf.TelegramOSSSetting.Secure, LocalMode: conf.TelegramOSSSetting.LocalMode, ChannelStrategy: conf.TelegramOSSSetting.ChannelStrategy}
+	}
 	if conf.SmsJuheSetting != nil {
 		bootstrapConfig.SmsJuhe = confSmsJuheSnapshot{Gateway: conf.SmsJuheSetting.Gateway, Key: conf.SmsJuheSetting.Key, TplID: conf.SmsJuheSetting.TplID, TplVal: conf.SmsJuheSetting.TplVal}
 	}
@@ -258,6 +273,7 @@ func ensureBootstrapSnapshot() {
 			AllowTweetVideo:           conf.WebProfileSetting.AllowTweetVideo,
 			AllowUserRegister:         conf.WebProfileSetting.AllowUserRegister,
 			AllowPhoneBind:            conf.WebProfileSetting.AllowPhoneBind,
+			RequireInviteRegister:     conf.WebProfileSetting.RequireInviteRegister,
 			DefaultTweetMaxLength:     conf.WebProfileSetting.DefaultTweetMaxLength,
 			TweetWebEllipsisSize:      conf.WebProfileSetting.TweetWebEllipsisSize,
 			TweetMobileEllipsisSize:   conf.WebProfileSetting.TweetMobileEllipsisSize,
@@ -289,6 +305,7 @@ func Registry() []Definition {
 		boolDef("web_profile.allow_tweet_video", "web", "profile", "Allow video posts", "Allow video uploads on posts.", ApplyModeLive, false, true, func() any { return conf.WebProfileSetting.AllowTweetVideo }, func() any { return bootstrapConfig.WebProfile.AllowTweetVideo }, func(v any) { conf.WebProfileSetting.AllowTweetVideo = v.(bool) }),
 		boolDef("web_profile.allow_user_register", "web", "profile", "Allow user registration", "Bootstrap-only registration gate from YAML/features.", ApplyModeBootstrapOnly, false, false, func() any { return conf.WebProfileSetting.AllowUserRegister }, func() any { return bootstrapConfig.WebProfile.AllowUserRegister }, nil),
 		boolDef("web_profile.allow_phone_bind", "web", "profile", "Allow phone binding", "Bootstrap-only phone binding gate from YAML/features.", ApplyModeBootstrapOnly, false, false, func() any { return conf.WebProfileSetting.AllowPhoneBind }, func() any { return bootstrapConfig.WebProfile.AllowPhoneBind }, nil),
+		boolDef("web_profile.require_invite_register", "web", "profile", "是否强制邀请码注册", "开启后用户注册必须填写有效邀请码，否则禁止注册。", ApplyModeLive, false, true, func() any { return conf.WebProfileSetting.RequireInviteRegister }, func() any { return bootstrapConfig.WebProfile.RequireInviteRegister }, func(v any) { conf.WebProfileSetting.RequireInviteRegister = v.(bool) }),
 		intDef("web_profile.default_tweet_max_length", "web", "profile", "Default tweet max length", "Maximum allowed tweet length.", ApplyModeLive, false, true, func() any { return conf.WebProfileSetting.DefaultTweetMaxLength }, func() any { return bootstrapConfig.WebProfile.DefaultTweetMaxLength }, func(v int) error { return between(v, 1, 2000, "default_tweet_max_length") }, func(v any) { conf.WebProfileSetting.DefaultTweetMaxLength = v.(int) }),
 		intDef("web_profile.tweet_web_ellipsis_size", "web", "profile", "Web ellipsis size", "Truncated feed length on web.", ApplyModeLive, false, true, func() any { return conf.WebProfileSetting.TweetWebEllipsisSize }, func() any { return bootstrapConfig.WebProfile.TweetWebEllipsisSize }, func(v int) error {
 			return between(v, 1, conf.WebProfileSetting.DefaultTweetMaxLength, "tweet_web_ellipsis_size")
@@ -339,6 +356,14 @@ func Registry() []Definition {
 		boolDefWithActive("local_oss.secure", "storage", "local_oss", "Local OSS secure", "Generate HTTPS URLs for local object storage.", ApplyModeRestartRequired, false, true, func() bool { return cfg.If("LocalOSS") }, func() any { return conf.LocalOSSSetting.Secure }, func() any { return bootstrapConfig.LocalOSS.Secure }, func(v any) { conf.LocalOSSSetting.Secure = v.(bool) }),
 		stringDefWithActive("local_oss.bucket", "storage", "local_oss", "Local OSS bucket", "Bucket folder name for local storage.", ApplyModeRestartRequired, false, true, nil, func() bool { return cfg.If("LocalOSS") }, func() any { return conf.LocalOSSSetting.Bucket }, func() any { return bootstrapConfig.LocalOSS.Bucket }, validateTrimmedMax("local_oss.bucket", 255), func(v any) { conf.LocalOSSSetting.Bucket = v.(string) }),
 		stringDefWithActive("local_oss.domain", "storage", "local_oss", "Local OSS domain", "Public domain for local object storage.", ApplyModeRestartRequired, false, true, nil, func() bool { return cfg.If("LocalOSS") }, func() any { return conf.LocalOSSSetting.Domain }, func() any { return bootstrapConfig.LocalOSS.Domain }, validateTrimmedMax("local_oss.domain", 255), func(v any) { conf.LocalOSSSetting.Domain = v.(string) }),
+
+		stringDefWithActive("telegram_oss.endpoint", "storage", "telegram_oss", "Telegram API endpoint", "Telegram Bot API endpoint (e.g. http://127.0.0.1:8081).", ApplyModeRestartRequired, false, true, nil, func() bool { return cfg.If("TelegramOSS") }, func() any { return conf.TelegramOSSSetting.Endpoint }, func() any { return bootstrapConfig.TelegramOSS.Endpoint }, validateTrimmedMax("telegram_oss.endpoint", 255), func(v any) { conf.TelegramOSSSetting.Endpoint = v.(string) }),
+		stringDefWithActive("telegram_oss.token", "storage", "telegram_oss", "Telegram Bot Token", "Telegram Bot Token from @BotFather.", ApplyModeRestartRequired, true, true, nil, func() bool { return cfg.If("TelegramOSS") }, func() any { return conf.TelegramOSSSetting.Token }, func() any { return bootstrapConfig.TelegramOSS.Token }, validateTrimmedMax("telegram_oss.token", 512), func(v any) { conf.TelegramOSSSetting.Token = v.(string) }),
+		stringDefWithActive("telegram_oss.proxy", "storage", "telegram_oss", "Telegram proxy", "HTTP or SOCKS5 proxy URL for Telegram Bot.", ApplyModeRestartRequired, false, true, nil, func() bool { return cfg.If("TelegramOSS") }, func() any { return conf.TelegramOSSSetting.Proxy }, func() any { return bootstrapConfig.TelegramOSS.Proxy }, validateTrimmedMax("telegram_oss.proxy", 255), func(v any) { conf.TelegramOSSSetting.Proxy = v.(string) }),
+		stringDefWithActive("telegram_oss.domain", "storage", "telegram_oss", "Telegram OSS domain", "Public domain for Telegram object storage.", ApplyModeRestartRequired, false, true, nil, func() bool { return cfg.If("TelegramOSS") }, func() any { return conf.TelegramOSSSetting.Domain }, func() any { return bootstrapConfig.TelegramOSS.Domain }, validateTrimmedMax("telegram_oss.domain", 255), func(v any) { conf.TelegramOSSSetting.Domain = v.(string) }),
+		boolDefWithActive("telegram_oss.secure", "storage", "telegram_oss", "Telegram OSS secure", "Use HTTPS for Telegram object storage URLs.", ApplyModeRestartRequired, false, true, func() bool { return cfg.If("TelegramOSS") }, func() any { return conf.TelegramOSSSetting.Secure }, func() any { return bootstrapConfig.TelegramOSS.Secure }, func(v any) { conf.TelegramOSSSetting.Secure = v.(bool) }),
+		boolDefWithActive("telegram_oss.local_mode", "storage", "telegram_oss", "Telegram local mode", "Local telegram-bot-api running in --local mode.", ApplyModeRestartRequired, false, true, func() bool { return cfg.If("TelegramOSS") }, func() any { return conf.TelegramOSSSetting.LocalMode }, func() any { return bootstrapConfig.TelegramOSS.LocalMode }, func(v any) { conf.TelegramOSSSetting.LocalMode = v.(bool) }),
+		stringDefWithActive("telegram_oss.channel_strategy", "storage", "telegram_oss", "Channel Strategy", "Multi-channel distribution strategy (round-robin, random, weight).", ApplyModeRestartRequired, false, true, nil, func() bool { return cfg.If("TelegramOSS") }, func() any { return conf.TelegramOSSSetting.ChannelStrategy }, func() any { return bootstrapConfig.TelegramOSS.ChannelStrategy }, validateTrimmedMax("telegram_oss.channel_strategy", 50), func(v any) { conf.TelegramOSSSetting.ChannelStrategy = v.(string) }),
 
 		stringDefWithActive("minio.access_key", "storage", "minio", "MinIO access key", "MinIO access key.", ApplyModeRestartRequired, false, true, nil, func() bool { return cfg.If("MinIO") }, func() any { return conf.MinIOSetting.AccessKey }, func() any { return bootstrapConfig.MinIO.AccessKey }, validateTrimmedMax("minio.access_key", 255), func(v any) { conf.MinIOSetting.AccessKey = v.(string) }),
 		stringDefWithActive("minio.secret_key", "storage", "minio", "MinIO secret key", "MinIO secret key.", ApplyModeRestartRequired, true, true, nil, func() bool { return cfg.If("MinIO") }, func() any { return conf.MinIOSetting.SecretKey }, func() any { return bootstrapConfig.MinIO.SecretKey }, validateTrimmedMax("minio.secret_key", 512), func(v any) { conf.MinIOSetting.SecretKey = v.(string) }),

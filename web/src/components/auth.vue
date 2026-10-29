@@ -135,6 +135,13 @@
                                     @keyup.enter.prevent="handleRegister"
                                 />
                             </n-form-item-row>
+                            <n-form-item-row :label="profile.requireInviteRegister ? '邀请码 (必填)' : '邀请码 (选填)'" path="invite_code">
+                                <n-input
+                                    :placeholder="profile.requireInviteRegister ? '本站已开启邀请制，请输入邀请码' : '请输入邀请码（选填）'"
+                                    v-model:value="registerForm.invite_code"
+                                    @keyup.enter.prevent="handleRegister"
+                                />
+                            </n-form-item-row>
                         </n-form>
                         <n-button
                             type="primary"
@@ -154,7 +161,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import { useStoreMain } from '@/store/main';
 import { TOKEN_KEY, useStoreUser } from '@/store/user';
 import { userInfo } from '@/api/auth';
@@ -180,8 +187,9 @@ const registerForm = reactive({
   username: '',
   password: '',
   repassword: '',
+  invite_code: '',
 });
-const registerRule = {
+const registerRule = computed(() => ({
   username: {
     required: true,
     message: '请输入账户名',
@@ -207,7 +215,16 @@ const registerRule = {
       trigger: 'input',
     },
   ],
-};
+  invite_code: profile.value.requireInviteRegister
+    ? [
+        {
+          required: true,
+          message: '本站已开启邀请制，请输入邀请码',
+          trigger: ['blur', 'input'],
+        },
+      ]
+    : [],
+}));
 const handleLogin = (e: Event) => {
   e.preventDefault();
   e.stopPropagation();
@@ -255,6 +272,7 @@ const handleRegister = (e: Event) => {
       Api.v1.auth.post.register({
         username: registerForm.username,
         password: registerForm.password,
+        invite_code: registerForm.invite_code,
       })
         .then((res) => {
           return Api.v1.auth.post.login({
@@ -278,6 +296,7 @@ const handleRegister = (e: Event) => {
           registerForm.username = '';
           registerForm.password = '';
           registerForm.repassword = '';
+          registerForm.invite_code = '';
         })
         .catch((err) => {
           loading.value = false;
@@ -287,6 +306,21 @@ const handleRegister = (e: Event) => {
 };
 
 onMounted(() => {
+  // 检查是否带有邀请码链接 ?invite=xxx 或 ?invite_code=xxx
+  try {
+    const hash = window.location.hash || '';
+    const hashQuery = hash.includes('?') ? hash.split('?')[1] : '';
+    const searchParams = new URLSearchParams(window.location.search ? window.location.search.slice(1) : hashQuery);
+    const code = searchParams.get('invite') || searchParams.get('invite_code');
+    if (code) {
+      registerForm.invite_code = code;
+      authModelTab.value = 'signup';
+      if (!localStorage.getItem(TOKEN_KEY)) {
+        storeMain.triggerAuth(true, 'signup');
+      }
+    }
+  } catch (e) {}
+
   const token = localStorage.getItem(TOKEN_KEY) || '';
   if (token) {
     userInfo(token)

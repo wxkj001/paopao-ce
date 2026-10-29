@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
+import { getUserPTProfile, type UserPTProfile } from "@/api/pt";
 
 /** 本地存储的用户令牌键名 */
 export const TOKEN_KEY = 'PAOPAO_TOKEN';
@@ -16,10 +17,40 @@ export const useStoreUser = defineStore('user', () => {
         is_admin: false,
     });
 
+    const userPTProfile = ref<UserPTProfile | null>(null);
+    let pendingProfilePromise: Promise<UserPTProfile | null> | null = null;
+
     const userLogined = computed(() => userInfo.value.id > 0);
 
     function updateUserinfo(data: Record<string, any>) {
         userInfo.value = data;
+        if (data?.id > 0) {
+            loadUserPTProfile();
+        }
+    }
+
+    async function loadUserPTProfile(force = false): Promise<UserPTProfile | null> {
+        if (!userLogined.value) {
+            userPTProfile.value = null;
+            return null;
+        }
+        if (userPTProfile.value && !force) {
+            return userPTProfile.value;
+        }
+        if (pendingProfilePromise && !force) {
+            return pendingProfilePromise;
+        }
+        pendingProfilePromise = getUserPTProfile()
+            .then((res) => {
+                userPTProfile.value = res;
+                pendingProfilePromise = null;
+                return res;
+            })
+            .catch(() => {
+                pendingProfilePromise = null;
+                return null;
+            });
+        return pendingProfilePromise;
     }
 
     function userLogout() {
@@ -34,11 +65,16 @@ export const useStoreUser = defineStore('user', () => {
             tweets_count: 0,
             is_admin: false,
         };
+        userPTProfile.value = null;
+        pendingProfilePromise = null;
     }
 
     return {
         userInfo,
         userLogined,
-        updateUserinfo, userLogout,
+        userPTProfile,
+        loadUserPTProfile,
+        updateUserinfo,
+        userLogout,
     }
 });

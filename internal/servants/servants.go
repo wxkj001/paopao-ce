@@ -15,6 +15,7 @@ import (
 	"github.com/rocboss/paopao-ce/internal/servants/pt"
 	"github.com/rocboss/paopao-ce/internal/servants/space"
 	"github.com/rocboss/paopao-ce/internal/servants/statick"
+	"github.com/rocboss/paopao-ce/internal/servants/tgoss"
 	"github.com/rocboss/paopao-ce/internal/servants/web"
 	"google.golang.org/grpc"
 )
@@ -26,6 +27,9 @@ func RegisterWebServants(e *gin.Engine) {
 	})
 	cfg.Be("LocalOSS", func() {
 		localoss.RouteLocalOSS(e)
+	})
+	cfg.Be("TelegramOSS", func() {
+		tgoss.RouteTelegramOSS(e)
 	})
 	cfg.Be("PT", func() {
 		pt.InitPT(e)

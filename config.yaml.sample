@@ -58,10 +58,48 @@ LocalOSS:
   Bucket: paopao
   Domain: 127.0.0.1:8008
 
+# TelegramOSS:
+#   Endpoint: "http://127.0.0.1:8081"
+#   Token: "YOUR_TELEGRAM_BOT_TOKEN"
+#   Proxy: ""
+#   Domain: 127.0.0.1:8008
+#   Secure: false
+#   LocalMode: false
+#   ChannelStrategy: "round-robin"
+#   Channels:
+#     - Id: "-1001234567890"
+#       Name: "MainStorageA"
+#       Weight: 10
+#   Cache:
+#     Enabled: true
+#     SavePath: "custom/data/paopao-ce/tgcache"
+#     MaxSizeMB: 4096
+#     MaxAgeDays: 30
+
 PT:
-  AnnounceUrl: "http://127.0.0.1:8008/tracker/announce"
+  AnnounceUrl: "http://127.0.0.1:8008/announce"
   WsAnnounceUrl: "ws://127.0.0.1:8008/tracker/ws"
   AnnounceInterval: 1800
   MinInterval: 300
   SiteSource: "[PaoPao] PaoPao PT"
   StoragePath: "custom/data/paopao-ce/torrents"
+  Authority:
+    PromotionInterval: 3600
+    ClassNames:
+      0: "贫民"
+      1: "普通会员"
+      2: "进阶用户"
+      3: "精英用户"
+      4: "疯狂用户"
+      5: "疯魔用户"
+      6: "骨灰用户"
+      7: "极品用户"
+      8: "巅峰用户"
+      9: "大师用户"
+      10: "VIP"
+      11: "养老退役"
+      12: "发布员"
+      13: "版主"
+      14: "管理员"
+      15: "技术主管"
+      16: "站长"

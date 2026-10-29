@@ -33,6 +33,10 @@ var (
 	ErrNoExistUsername         = xerror.NewError(20021, "用户不存在")
 	ErrNoAdminPermission       = xerror.NewError(20022, "无管理权限")
 	ErrDisallowUserRegister    = xerror.NewError(20023, "系统不允许注册用户")
+	ErrRequireInviteCode       = xerror.NewError(20024, "本站已开启邀请注册制，注册必须填写有效邀请码")
+	ErrInvalidInviteCode       = xerror.NewError(20025, "邀请码无效或不存在")
+	ErrInviteCodeUsed          = xerror.NewError(20026, "该邀请码已被使用")
+	ErrInviteCodeExpired       = xerror.NewError(20027, "该邀请码已过期")
 
 	ErrGetPostsFailed          = xerror.NewError(30001, "获取动态列表失败")
 	ErrCreatePostFailed        = xerror.NewError(30002, "动态发布失败")
